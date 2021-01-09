@@ -514,7 +514,7 @@ For completeness, we begin with the simplest nontrivial inductive definition: th
     &\const{nrec} : (P : (n: \Nat) \to \Type) \to (pz: P ~ \zero) \\
     &\qquad\to (ps: (n: \Nat) \to (pn: P ~ n) \to P ~ (\succ ~ n)) \\
     &\qquad\to (n: \Nat) \to P ~ n \\
-    &\const{nrec} ~ P ~ pz ~ ps ~ (\zero) \coloneqq pz \\
+    &\const{nrec} ~ P ~ pz ~ ps ~ \zero \coloneqq pz \\
     &\const{nrec} ~ P ~ pz ~ ps ~ (\succ ~ n) \coloneqq ps ~ n ~ (\const{nrec} ~ P ~ pz ~ ps ~ n)
 \end{align*}
 
@@ -536,7 +536,44 @@ This is the usual mathematical induction over natural numbers: we prove that som
 
 The type $\Fin ~ n$ represents the set of numbers no greater than $n$; the type has $n$ inhabitants. For instance, there are no possible elements of type $\Fin ~ \zero$; $\fzero ~ \zero$ is the only element of type $\Fin ~ (\succ ~ \zero)$; $\fzero ~ (\succ ~ \zero)$ and $\fsucc ~ (\succ ~ \zero) ~ (\fzero ~ \zero)$ are the only elements of type $\Fin ~ (\succ ~ (\succ ~ \zero))$; and so on.
 
-% TODO: Lists, Vectors, W types
+Next, we move on to the simplest nontrivial parametrized inductive definition, the list, which has already appeared in our definition of trees.
+%
+\begin{align*}
+    \data ~ &\List ~ (A: \Type): \Type ~ \where \\
+    &\nil: \List ~ A \\
+    &\cons : (a: A) \to (l: \List ~ A) \to \List ~ A
+\end{align*}
+\begin{align*}
+    &\const{lrec}: (A: \Type) \to (P: (l: \List ~ A) \to \Type) \to (pn: P ~ \nil) \\
+    &\qquad\to (ps: (a: A) \to (l: \List ~ A) \to (pl: P ~ l) \to P ~ (\cons ~ a ~ l)) \\
+    &\qquad\to (l: \List ~ A) \to P ~ l \\
+    &\const{lrec} ~ A ~ P ~ pn ~ ps ~ \nil \coloneqq pn \\
+    &\const{lrec} ~ A ~ P ~ pn ~ ps ~ (\cons ~ a ~ l) \coloneqq ps ~ a ~ l ~ (\const{lrec} ~ A ~ P ~ pn ~ ps ~ l)
+\end{align*}
+
+Analogous to lists are \emph{vectors}, which are lists whose lengths are encoded in the type as an index, and one of the simplest nontrivial inductive definitions with both a parameter and an index.
+%
+\begin{align*}
+    \data ~ &\Vector ~ (A: \Type): (n: \Nat) \to \Type ~ \where \\
+    &\vnil: \Vector ~ A ~ \zero \\
+    &\vcons: (n: \Nat) \to (a: A) \to (v: \Vector ~ A ~ n) \to \Vector ~ A ~ (\succ n)
+\end{align*}
+\begin{align*}
+    &\const{vrec}: (A: \Type) \to (P: (n: \Nat) \to (v: \Vector ~ A ~ n) \to \Type) \to (pvn: P ~ \zero ~ \vnil) \\
+    &\qquad\to (pvc: (n: \Nat) \to (a: A) \to (v: \Vector ~ A ~ n) \to (pv: P ~ n ~ v) \to P ~ (\succ ~ n) ~ (\vcons ~ n ~ a ~ v)) \\
+    &\qquad\to (n: \Nat) \to (v: \Vector ~ A ~ n) \to P ~ n ~ v \\
+    &\const{vrec} ~ A ~ P ~ pvn ~ pvc ~ \zero ~ \vnil \coloneqq pvn \\
+    &\const{vrec} ~ A ~ P ~ pvn ~ pvc ~ (\succ ~ n) ~ (\vcons ~ n ~ a ~ v) \coloneqq pvc ~ n ~ a ~ v ~ (\const{vrec} ~ A ~ P ~ pvn ~ pvc ~ n ~ v)
+\end{align*}
+
+So far, we have only seen inductive definitions whose constructor arguments are \emph{not} functions. The simplest such inductive definition that doesn't rely on other definitions are the \emph{well-founded trees}, also known as \emph{W types}.
+%
+\begin{align*}
+    \data ~ &\W ~ (A : \Type) ~ (B: A \to \Type): \Type ~ \where \\
+    &\const{sup}: (a: A) \to (w: B ~ a \to \W ~ A ~ B) \to \W ~ A ~ B
+\end{align*}
+
+Occasionally the type is written as $\W (x: A). B(x)$, just as function types may be written as $\Pi (x: A). B(x)$. 
 
 \section{W Types}
 
