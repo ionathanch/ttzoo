@@ -22,4 +22,5 @@ A collection of notes on various features commonly found in type theories whose 
 
 ## TODOs
 * Remove introducing dependent eliminators from _Notions of Equality_
+* "Judgemental equality" is **not** extensional equality, and no-one uses "computational equality"
 * Fix DOT graph generation
