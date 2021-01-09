@@ -11,6 +11,7 @@ A collection of notes on various features commonly found in type theories whose 
   * The PTS model (rules and axioms)
 * Type universes (want!!)
   * The universe hierarchy
+  * Russell vs. Tarski universes
   * Cumulativity
   * Impredicativity
   * Girard's paradox
