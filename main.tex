@@ -1,0 +1,1224 @@
+\documentclass{report}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1.25in]{geometry}
+\usepackage[pdf]{graphviz}
+\usepackage[natbib=true]{biblatex}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{mathtools} % for \coloneqq
+\usepackage{fdsymbol} % for \stareq
+\usepackage{xspace} % for \xspace
+\usepackage{mathpartir}
+\usepackage{epigraph}
+\usepackage[toc]{appendix}
+\usepackage[colorlinks=true]{hyperref}
+\usepackage[no-math]{fontspec}
+\newfontfamily{\NotoEmoji}{NotoColorEmoji.ttf}[Renderer=Harfbuzz]
+
+\title{The Type Theory Zoo}
+\author{@ionathanch}
+
+\newcommand{\Nat}{\const{Nat}}
+\newcommand{\zero}{\const{zero}}
+\renewcommand{\succ}{\const{succ}}
+\newcommand{\List}{\const{List}}
+\newcommand{\nil}{\const{nil}}
+\newcommand{\cons}{\const{cons}}
+\newcommand{\Tree}{\const{Tree}}
+\newcommand{\Forest}{\const{Forest}}
+\newcommand{\TreeForest}{\const{TreeForest}}
+\newcommand{\tree}{\const{tree}}
+\newcommand{\Fin}{\const{Fin}}
+\newcommand{\fzero}{\const{fzero}}
+\newcommand{\fsucc}{\const{fsucc}}
+\newcommand{\Bool}{\const{Bool}}
+\newcommand{\true}{\const{true}}
+\newcommand{\false}{\const{false}}
+\newcommand{\Vector}{\const{Vec}}
+\newcommand{\vnil}{\const{vnil}}
+\newcommand{\vcons}{\const{vcons}}
+\newcommand{\W}{\const{W}}
+\renewcommand{\sup}{\const{sup}}
+
+\newcommand{\const}[1]{\text{#1}}
+\newcommand{\data}{\const{data}}
+\newcommand{\Type}{\const{Type}}
+\newcommand{\where}{\const{where}}
+\newcommand{\case}{\const{case}}
+\newcommand{\of}{\const{of}}
+\newcommand{\match}{\const{match}}
+\newcommand{\with}{\const{with}}
+\newcommand{\inn}{\const{in}}
+\newcommand{\fixpoint}{\const{fixpoint}}
+\newcommand{\fix}{\const{fix}}
+\newcommand{\elim}{\const{elim}}
+\newcommand{\refl}{\const{refl}}
+\newcommand{\fst}{\const{fst}}
+\newcommand{\snd}{\const{snd}}
+\newcommand{\jelim}{\const{J}\xspace}
+\newcommand{\kelim}{\const{K}\xspace}
+\newcommand{\uip}{\const{UIP}\xspace}
+\newcommand{\rip}{\const{RIP}\xspace}
+\newcommand{\lip}{\const{LIP}\xspace}
+\newcommand{\funext}{\const{funext}\xspace}
+\newcommand{\subst}{\const{subst}\xspace}
+\newcommand{\refrule}[1]{\textsc{#1}}
+\newcommand{\jmeq}[2]{\prescript{}{#1}{\measeq}_{#2}}
+
+\setlength{\epigraphwidth}{1.1\epigraphwidth}
+\addbibresource{biblio.bib}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+
+\chapter{Inductive Structures}
+
+\section{How to Define Data}
+
+You can get away with a lot when you have dependent functions, dependent pairs, and an equality type. They do represent, after all, the universal quantifier, the existential quantifier, and equality in predicate logic, and using $(A: \Type) \to A$ as your notion of falsehood (since it is never inhabited), you're able to express negation. What more do you need?\footnote{You may notice the absence of logical disjunction here, which cannot be fully expressed by the negation of logical conjunction in intuitionistic logic. Please stop noticing. We will fix this in due time.}
+
+Unfortunately, the world is not made of predicates and propositions. To talk about various properties of things, we need \emph{things} to talk about. Historically things are made out of judgement rules directly, and these come in five different kinds:
+
+\begin{enumerate}
+    \item \textbf{Formation rules}, which describe how to form a new type, such as \Nat for the Peano naturals;
+    \item \textbf{Introduction rules}, which describe how to build inhabitants (if any) of your new type, which would be \zero and \const{succ} for \Nat;
+    \item \textbf{Elimination rules}, which describe how to use the inhabitants;
+    \item \textbf{Computation rules}, which describe how an eliminator wrapped around a constructor uses its components; and optionally
+    \item \textbf{Uniqueness rules}, which describe how a constructor wrapped around an eliminator produces the same term that was eliminated.
+\end{enumerate}
+
+The problem is that these rules are part of the type theory, and the programmer cannot\footnote{And should not, lest they introduce an inconsistency due to an unvetted rule, or worse, destroy the decidability of type checking!} arbitrarily introduce new rules. They should be able to introduce new pieces of data to use during proving and programming, under the close scrutiny of well-typedness. So far, there are three common ways to allow this:
+
+\begin{enumerate}
+    \item \textbf{Inductive data definitions}, where formation and introduction forms defined individually are subject to strict conditions to ensure consistency, and there is a common elimination form;
+    \item \textbf{W-types}, where there is a single set of rules for modelling \emph{well-founded trees}, but have various limitations, such as the dependence on function extensionality; and
+    \item \textbf{Recursive} or \textbf{$\mu$-types}, which are somewhere in between these two, being a single set of rules like W-types, but also require some strict conditions.
+\end{enumerate}
+
+All of these have corresponding dual concepts for (usually) infinite data structures: coinductive data definitions, M-types, and corecursive or $\nu$-types.
+
+\section{Inductive Data Definitions}
+
+The general form of an inductive data definition is as follows:
+%
+\begin{align*}
+    \data ~ I ~ \Delta_P &: \Delta_I \to \Type ~ \where \\
+    \langle c_i &: \Delta_i \to I ~ \Delta_P ~ \Vec{e}_i \rangle_i
+\end{align*}
+
+$\Delta$ is a \emph{telescope} of a variable and its type $(x_1: A_1) \dots (x_n: A_n)$, where $A_j$ can depend on any $x_i$ where $i < j$. We abuse this notation in several places:
+%
+\begin{itemize}
+    \item $\Delta \to B$ means the function type $(x_1: A_1) \to \dots \to (x_n: A_n) \to B$;
+    \item $f ~ \Delta ~ \Vec{y}$ means the function application $f ~ x_1 \dots x_n ~ y_1 \dots y_m$;
+    \item $\data ~ I ~ \Delta$ in inductive data definitions expands to $\data ~ I ~ (x_1: A_1) \dots (x_n: A_n)$;
+    \item $e[\Delta \mapsto \Vec{a}]$ means the simultaneous substitution $e\overrightarrow{[x_i \mapsto a_i]}$, where $\Vec{a} = a_1 \dots a_n$; and
+    \item $\Gamma \vdash \Vec{a} : \Delta$ means that $\Gamma \vdash a_i: A_i$ all hold.
+\end{itemize}
+
+Telescopes may be empty as well, which extends to the above notation abuse in the obvious manners.
+
+In the data definition above, $\Delta_P$ are the \emph{parameters} of the type $I$, while $\Delta_I$ are its \emph{indices}. The inductive type $I$ itself has type $\Delta_P \to \Delta_I \to \Type$. The difference between parameters and indices is that parameters must be the same for every constructor, while indices may differ. $\Delta_i$ are the \emph{arguments} of the constructor $c_i$, and a fully-applied constructor would have type $I ~ \Delta_p ~ \Vec{e}_i$, where $\Vec{e}_i$ are the indices for that particular constructor's type.
+
+\section{Well-Formedness of Inductive Definitions}
+
+The data definition must first be well-typed. This means that $\Delta_P \to \Delta_I \to \Type$ must be a well-typed function type, and each $\Delta_i \to I ~ \Delta_P ~ \Vec{e}_i$ must be a well-typed function type in the context where $I: \Delta_P \to \Delta_I \to \Type$. These correspond to the introduction and formation rules.
+%
+\begin{mathpar}
+    \inferrule*[Right=form]{
+        \Gamma \vdash \Delta_P \to \Delta_I \to \Type_{\ell} : \Type_{k}
+    }{
+        \Gamma \vdash I : \Delta_P \to \Delta_I \to \Type_{\ell}
+    }
+    
+    \inferrule*[Right=intro$_i$]{
+        \Gamma \Delta_P (I : \Delta_P \to \Delta_I \to \Type_{\ell}) \vdash \Delta_i \to I ~ \Delta_P ~ \Vec{e}_i : \Type_{\ell}
+    }{
+        \Gamma \vdash c_i : \Delta_i \to I ~ \Delta_P ~ \Vec{e}_i
+    }
+\end{mathpar}
+
+\subsection{Strict Positivity}
+
+On top of well-typedness, the definition needs to satisfy some syntactic conditions. In the arguments of a constructor, $I$ cannot appear anywhere it likes, because this can result in proofs of $\bot$. As an example, consider the following inductive definition:
+%
+\begin{align*}
+    \data ~ \const{B} &: \Type ~ \where \\
+    \const{b} &: (\const{B} \to \bot) \to \const{B}
+\end{align*}
+
+For now, we define a function that returns the argument of \const{b} rather than define its eliminator or a general way to destruct constructors.
+%
+\begin{align*}
+    &\const{getB}: \const{B} \to (\const{B} \to \bot) \\
+    &\const{getB} ~ (\const{b} ~ bb) \coloneqq bb
+\end{align*}
+
+Then we are able to prove $\bot$ by showing that $\const{B}$ both holds and does not hold.
+%
+\begin{align*}
+    &\const{notB}: \const{B} \to \bot \\
+    &\const{notB} ~ b \coloneqq (\const{getB} ~ b) ~ b \\
+    \\
+    &\const{falsehood}: \bot \\
+    &\const{falsehood} \coloneqq \const{notB} ~ (\const{b} ~ \const{notB})
+\end{align*}
+
+The following similar inductive definition also allows us to prove $\bot$.
+%
+\begin{align*}
+    \data ~ \const{B} &: \Type ~ \where \\
+    \const{b} &: (((\const{B} \to \bot) \to \bot) \to \bot) \to \const{B}
+\end{align*}
+\begin{align*}
+    &\const{getB}: \const{B} \to (((\const{B} \to \bot) \to \bot) \to \bot) \\
+    &\const{getB} ~ (\const{b} ~ bb) \coloneqq bb \\
+    \\
+    &\const{doubleNeg}: (B: \Type) \to B \to (B \to \bot) \to \bot \\
+    &\const{doubleNeg} ~ B ~ b ~ notB \coloneqq notB ~ b \\
+    \\
+    &\const{tripleNeg}: (B: \Type) \to (((B \to \bot) \to \bot) \to \bot) \to B \to \bot \\
+    &\const{tripleNeg} ~ B ~ notnotnotB ~ b \coloneqq notnotnotB ~ (\const{doubleNeg} ~ B ~ b) \\
+    \\
+    &\const{notB}: \const{B} \to \bot \\
+    &\const{notB} ~ b \coloneqq \const{tripleNeg} ~ \const{B} ~ (\const{getB} ~ b) ~ b \\
+    \\
+    &\const{falsehood}: \bot \\
+    &\const{falsehood} \coloneqq \const{notB} ~ (\const{b} ~ (\const{doubleNeg} ~ (\const{B} \to \bot) ~ \const{notB})) \\
+\end{align*}
+
+Note that $\const{doubleNeg}$ and $\const{tripleNeg}$ are stated in terms of a general type $B$. In fact, if we are allowed to define a constructor whose inductive type appears to the left of an odd number of arrows in an argument type, we are always able to prove $\bot$. Given $\const{b}: (((\const{B} \to \bot) \to \dots) \to \bot) \to \const{B}$ for an odd number of arrows, we can produce a term of type $\const{B} \to \bot$ by a repeated application of $\const{tripleNeg}$, a term of type $\const{B}$ by a repeated application of $\const{doubleNeg}$, and finally $\const{falsehood}$.
+
+Therefore, we must at the very least disallow an inductive type to appear to the left of an odd number of arrows in the type of any of its constructors' arguments, since such a constructor would effectively be a proof that falsehood of that type implies truthhood of the type. This is called the \emph{positivity condition}, while the positions to the left of an odd number of arrows are \emph{negative positions}, since being to the left of an odd number of $\bot$ implies simple negation.
+
+Most also impose a \emph{strict positivity condition} and disallow the inductive type to appear to the left of \emph{any} number of arrows for various reasons, since a type theory with an impredicative \const{Prop} type universe (or similar) could again derive $\bot$ using merely positive inductive definitions \citep{strict-pos}. The key idea the latter is that a constructor of type $b: ((\const{B} \to \Type) \to \Type) \to \const{B}$ would enable creating an injective function $f: (\const{B} \to \Type) \to \const{B}$ through the injection $i: (\const{B} \to \Type) \to ((\const{B} \to \Type) \to \Type)$. If types are viewed as sets, then the cardinality of $\const{B} \to \Type$ is $|\Type|^{|\const{B}|}$, but injectivity of $f$ asserts that $|\Type|^{|\const{B}|} \leq |\const{B}|$, which is clearly a contradiction (assuming that at least two types exist). This extends to $\const{B}$ appearing to the left of any even number of arrows, since it can always be reduced two arrows by $\const{tripleNeg}$.
+
+% On the other hand, allowing the inductive type to appear to the left of a nonzero even number of arrows would be equivalent to allowing a proof of $(A: \Type) \to ((A \to \bot) \to \bot) \to A$, or double negation elimination, in other words. From double negation we can also derive the law of excluded middle, the absence of either of which is exactly what distinguishes constructive from and classical logic. Since basic dependent type theory is based upon constructive logic, most also impose a \emph{strict positivity} condition that disallows the inductive type to appear to the left of \emph{any} number of arrows to prevent the derivability of these laws.\footnote{Another reason is that if the type theory has impredicative \const{Prop}, $\bot$ can again be proven \citep{strict-pos}.}
+
+\subsection{Mutual Inductive Definitions}
+
+So far, inductive data definitions can implicitly depend on previously-defined ones. We now consider mutual definitions that depend on one another. To prevent an illegible proliferation of subscripts, we instead deal with two concrete mutual inductive definitions.
+%
+\begin{align*}
+    \data ~ &\Tree ~ (A: \Type) : \Type ~ \where \\
+    &\Tree: A \to \Forest ~ A \to \Tree ~ A \\
+    \\
+    \data ~ &\Forest ~ (A: \Type): \Type ~ \where \\
+    &\nil: \Forest ~ A \\
+    &\cons: \Tree ~ A \to \Forest ~ A \to \Forest ~ A
+\end{align*}
+
+A forest is a specialized list of trees, while a tree is some datum $A$ along with a forest. Intuitively, along with the usual strict positivity conditions, $\Forest$ should also only appear strictly positively in the argument types of $\Tree$ and vice versa. Furthermore, all constructors $\tree$, $\nil$, and $\cons$ must be well-typed under the context containing both $\Tree$ and $\Forest$. However, $\Tree$ is not to be typed under the context containing $\Forest$, and vice versa. (On the other hand, if two inductive definitions have constructors that mutually use the other inductive type and one inductive type uses the other as an index, then these become \emph{inductive-inductive} definitions.)
+
+Mutual definitions can sometimes be encoded as a single inductive type with an index to distinguish between the former mutual definitions \citep{rooster}, especially when disregarding issues with universe levels. For instance, using elements of $\const{Bool}$ to differentiate between trees and forests, we can define a combined $\TreeForest$ type.
+%
+\begin{align*}
+    \data ~ &\TreeForest ~ (A: \Type) : \const{Bool} \to \Type ~ \where \\
+    &\tree: A \to \TreeForest ~ A ~ \false \to \TreeForest ~ A ~ \true \\
+    &\nil: \TreeForest ~ A ~ \false \\
+    &\cons: \TreeForest ~ A ~ \true \to \TreeForest ~ A ~ \false \to \TreeForest ~ A ~ \false
+\end{align*}
+
+Then we can simply redefine $\Tree ~ A$ as $\TreeForest ~ A ~ \true$ and $\Forest ~ A$ as $\TreeForest ~ A ~ \false$.
+
+To summarize so far, suppose that for a constructor $c_i$ of an inductive type $I$ we have $$\Delta_i = (x_{i1}: A_{i1}) \to \dots \to (x_{im}: A_{im}).$$ Then each $A_{ij}$ must have the form $\Delta_{ij} \to D_{ij}$, and $I$ must not appear in $\Delta_{ij}$ to satisfy strict positivity. In the case of mutual definitions for inductive types $\Vec{I}$, none of $\Vec{I}$ may appear in any $\Delta_{ij}$ of any constructor of any type.
+
+\subsection{Nested Positivity}
+
+In the constructor argument type $\Delta_{ij} \to D_{ij}$ for an inductive type $I$, we may have that $D_{ij} = I' ~ \Delta_P ~ \Vec{e}_{ij}$, where $I$ may or may not be the same inductive type as $I'$. The obvious question follows: could $I$ appear in the parameters or the indices?
+
+Consider again the mutually-defined inductives for trees and forests. Instead of redefining a custom type for a list of trees as forest, we may wish to reuse the usual list type.
+%
+\begin{align*}
+    \data ~ &\Tree ~ (A: \Type) : \Type ~ \where \\
+    &\tree : A \to \const{List} ~ (\Tree ~ A) \to \Tree ~ A
+\end{align*}
+
+This seems like a perfectly reasonable definition to allow. (In fact, mutual inductive definitions may generally be desugared into nested inductive definitions, even when the definitions belong to different universe levels \parencite[Section 8.6.3]{semantical-inductive}.) Since $\Tree$ appears in the parameter of $\const{List}$, we may generally wish to allow $I$ in $\Vec{p}_{ij}$. But again, if it's allowed to appear \emph{anywhere}, we are able to prove $\bot$:
+%
+\begin{align*}
+    \data ~ &\const{Box} ~ (A: \Type) : \Type ~ \where \\
+    &\const{box} : A \to \const{Box} ~ A \\
+    \\
+    \data ~ &\const{B} ~ : \Type ~ \where \\
+    &\const{b} : \const{Box} ~ (\const{B} \to \bot) \to \const{B}
+\end{align*}
+
+We can compose the respective $\const{getBox}$ and $\const{getB}$ functions that return the constructor arguments to yield a function of type $\const{B} \to (\const{B} \to \bot)$, and from these three we can proceed to define $\const{notB}$ and $\const{isB}$ as before. So $I$ must again appear strictly positively in $\Vec{p}_{ij}$.\footnote{In fact, if $I = I'$, then $I$ can even appear \emph{negatively} in the parameters! For instance, $$\data ~ I ~ (A: \Type) : \Type ~ \where ~ c: I ~ (I ~ A\to \bot) \to I ~ A$$ is a valid inductive data definition in Agda. It's unclear whether such a definition would be at all useful in any way.} On the other hand, $I$ cannot appear at all in the indices (or in any parameter that any constructor uses as an index), since we can prove $\bot$ by equating that index with an argument in a negative position.
+%
+\begin{align*}
+    \data ~ &(=) : \Type \to \Type \to \Type ~ \where \\
+    &\const{refl} : (A : \Type) \to A = A \\
+    \\
+    \data ~ &\const{B} : \Type ~ \where \\
+    &\const{b} : (A : \Type) \to A = B \to (A \to \bot) \to B
+\end{align*}
+\begin{align*}
+    &\const{notB} : \const{B} \to \bot \\
+    &\const{notB} ~ (\const{b} ~ \const{B} ~ \const{refl} ~ notB) \coloneqq notB \\
+    \\
+    &\const{falsehood} : \bot \\
+    &\const{falsehood} \coloneqq \const{notB} ~ (\const{b} ~ \const{B} ~ \const{refl} ~ \const{notB})
+\end{align*}
+
+There is a subtle issue here that prevents this definition from type checking as it is. Suppose $\const{B} : \Type_{\ell}$ were in universe level $\ell$. Then the type of $\const{b}$ must be in at least universe level $\ell + 1$, since it takes $A : \Type_{\ell}$ as an argument. To circumvent this, everything can be made to exist in a impredicative $\const{Prop}$ universe instead (which can be done in Coq), or \emph{induction-recursion} (simultaneously defining an inductive data definition and a recursive function that use each other) can be used to ``shrink'' the universe of $A$ (which can be done in Agda) \citep{nested-pos}.
+
+To summarize yet again what we know so far, we mutually define the notions of strict and nested positivity, and state the conditions for a valid constructor type.
+
+\begin{itemize}
+    \item A constant $X$ appears strictly positively in the type $\Delta \to D$ if $I$ does not appear in $\Delta$ and nested positively in the type $D$.
+    \item A constant $X$ appears nested positively in the type $I ~ \Vec{p} ~ \Vec{e}$ if $X$ appears strictly positively in each of $\Vec{p}$, strictly positively in the return types of the constructors of $I ~ \Vec{p} ~ \Vec{e}'$, and not at all in $\Vec{e}$.
+    \item The constructor type $c_i: \Delta_i \to I ~ \Delta_P ~ \Vec{e}_i$ is well-formed if $I$ appears strictly positively in each of $\Delta_i$ and not all in $\Vec{e}_i$.
+\end{itemize}
+
+Finally, let us restate the general form of a (non-mutual) inductive data definition.
+%
+\begin{align*}
+    \data ~ &I ~ \Delta_P : \Delta_I \to \Type ~ \where \\
+    \langle c_i &: \langle (x_{ij}: \Delta_{ij} \to D_{ij}) \rangle_j \to I ~ \Delta_P ~ \Vec{e}_i \rangle_i \\
+\end{align*}
+%
+Again, $I$ must not appear in any $\Delta_{ij}$ and nested positively in $D_{ij}$.
+
+\section{Recursion on Inductive Data}
+
+Now that we have our formation and introduction rules along with the syntactic conditions imposed upon then, we need some elimination and computation rules. There are a few different ways to handle an inductive term, but they must do all of the following:
+
+\begin{itemize}
+    \item \textbf{Discriminate} the constructors from one another (in other words, it must handle all possible constructors);
+    \item \textbf{Decompose} the constructors into their components so that each piece may be used;
+    \item \textbf{Recur} on the components according to the type's induction principle; and
+    \item \textbf{Terminate} on all inputs.
+\end{itemize}
+
+For programming practicality, the ways that inductive data are eliminated don't restrict recursion to occur only on the components of the constructors, but unrestricted recursion easily allows for nontermination and therefore inconsistency. There are a number of ways to restrict recursion to prevent this, but they will not be covered here.
+
+\subsection{Pattern Matching}
+
+Inductive data may be handled by defining recursive functions that pattern-match on constructors. For instance, the following computes the depth of a tree with two pattern-matching definitions:
+%
+\begin{align*}
+    &\const{depth} : (A : \Type) \to \Tree ~ A \to \Nat \\
+    &\const{depth} ~ A ~ (\tree ~ a ~ \nil) \coloneqq \succ ~ \zero \\
+    &\const{depth} ~ A ~ (\tree ~ a ~ (\cons ~ t ~ ts)) \coloneqq \const{max} ~ (\succ ~ (\const{depth} ~ A ~ t)) ~ (\const{depth} ~ A ~ (\tree ~ a ~ ts))
+\end{align*}
+
+Here, $\const{max}$ is a function that takes the maximum of two $\Nat$s. Immediately we can see that the recursion is not so simple -- here, a recursive call is done on a new tree containing the rest of the list of trees, which is not directly a component of the original tree. There is an interplay between decomposition and discrimination as well, especially with inductive types with indices: pattern-matching on some argument of the function can restrict what the other arguments can be (which are then called \emph{inaccessible} or \emph{forced} arguments), and earlier definitions can influence which constructors need to be covered in later definitions. Generally pattern-matching is very powerful but very intricate, and are usually desugared into \emph{case trees} in proof assistants such as Agda.
+
+\subsection{Case Expressions}
+
+We now turn to case expressions, which handle only discrimination and decomposition. If we use case expressions without any recursion, we are still able to define simple functions, such as the following that returns the first element of a tree:
+%
+\begin{align*}
+    &\const{get} : (A : \Type) \to \Tree ~ A \to A \\
+    &\const{get} ~ A ~ t \coloneqq \\
+    &\quad\case ~ (\lambda t: \Tree ~ A . ~ A) ~ t ~ \of \\
+    &\qquad\tree \Rightarrow \lambda a: A. ~ \lambda trees: \const{List} ~ (\Tree ~ A). ~ a
+\end{align*}
+
+Ignoring the second function argument of the case expression for now, we see that this is similar to pattern matching: $t$ gets decomposed into a $\tree$ with arguments $a$ and $trees$ through the function in the single branch of the expression. However, this is much more simple than pattern-matching, since $a$ and $trees$ are not patterns and merely bind to the constructor arguments. Below we give the typing rules for case expressions in general, assuming that the inductive type $I : \Delta_P \to \Delta_I \to \Type$ and its constructors $c_i : \Delta_P \to \Delta_i \to I ~ \Delta_P ~ \Vec{e}_i$ abstracted over its parameters exist in the environment $\Gamma$. We also use the telescopes $\Delta_P, \Delta_I, \Delta_i$ from the inductive definition.
+%
+\begin{mathpar}
+    \inferrule*[Right=case]{
+        \Gamma \vdash t : I ~ \Vec{p} ~ \Vec{e}
+        \and
+        \Gamma \vdash P : \Delta_I[\Delta_P \mapsto \Vec{p}] \to (x: I ~ \Vec{p} ~ \Delta_I) \to \Type
+        \\\\
+        \Gamma \vdash d_i : \Delta_i \to P ~ \Vec{e}_i[\Delta_P \mapsto \Vec{p}] ~ (c_i ~ \Vec{p} ~ \Delta_i)
+    }{
+        \Gamma \vdash \case ~ P ~ t ~ \of ~ \langle c_i \Rightarrow d_i \rangle_i : P ~ \Vec{e} ~ t
+    }
+\end{mathpar}
+
+The inductive datum $t$ being discriminated and decomposed is called the \emph{target}, while the function $P$ that dictates the return type of the case expression is called the \emph{motive}. There is a \emph{branch} or \emph{method} $d_i$ for each of the constructors. Because everything implicitly uses (i.e. without explicit application) the parameters $\Vec{p}$ of the target's type, they need to be substituted into the types of the indices $\Delta_I$ and the constructor's return type's indices $\Vec{e}_i$. If inductive definitions had only indices and no parameters (which would be just as powerful, since all parameters can be encoded as indices), the typing rule (with $I : \Delta_I \to \Type$ and $c_i : \Delta_i \to I ~ \Delta_P ~ \Vec{e}_i$ in $\Gamma$) would no longer require these substitutions.
+%
+\begin{mathpar}
+    \inferrule*[Right=case-idx]{
+        \Gamma \vdash t : I ~ \Vec{e}
+        \and
+        \Gamma \vdash P : \Delta_I \to (x: I ~ \Delta_I) \to \Type
+        \\\\
+        \Gamma \vdash d_i : \Delta_i \to P ~ \Vec{e}_i ~ (c_i ~ \Delta_i)
+    }{
+        \Gamma \vdash \case ~ P ~ t ~ \of ~ \langle c_i \Rightarrow d_i \rangle_i : P ~ \Vec{e} ~ t
+    }
+\end{mathpar}
+
+Taking it one step further, if we can make the case expression \emph{nondependent} by removing the dependency of the motive on the indices and the target. In this case, the motive can be inferred entirely and does not need to be provided.
+%
+\begin{mathpar}
+    \inferrule*[Right=case-nondep]{
+        \Gamma \vdash t : I ~ \Vec{e}
+        \and
+        \Gamma \vdash d_i : \Delta_i \to P
+    }{
+        \Gamma \vdash \case ~ t ~ \of ~ \langle c_i \Rightarrow d_i \rangle_i : P
+    }
+\end{mathpar}
+
+Notice that $P$ and $d_i$ are all terms of function type, but do not have to syntactically be functions: they can also be terms that \emph{reduce} to functions. We can prevent the appearance of arbitrary function-typed terms by explicitly binding variables in an alternate match expression.
+%
+\begin{mathpar}
+    \inferrule*[Right=match]{
+        \Gamma \vdash t : I ~ \Vec{p} ~ \Vec{e}
+        \and
+        \Gamma \Delta_I (x : I ~ \Vec{p} ~ \Delta_I) \vdash P[y \mapsto \Delta_I] : \Type
+        \\\\
+        \Gamma \Delta_i \vdash d_i[\Vec{z} \mapsto \Delta_i] : P ~ \Vec{e}[\Delta_P \mapsto \Vec{p}] ~ (c_i ~ \Vec{p} ~ \Delta_i)
+    }{
+        \Gamma \vdash \match ~ x.\Vec{y}.P ~ t ~ \with ~ \langle c_i ~ \Vec{z} \Rightarrow d_i \rangle_i : P[x \mapsto t][\Vec{y} \mapsto \Vec{e}]
+    }
+\end{mathpar}
+
+This results in function application in the computation rule for case expressions and substitution in the computation rule for match expressions. Since they don't rely on any of the types, we can instead write them as untyped reduction rules, sometimes referred to as \emph{$\iota$-reduction}.
+%
+\begin{align*}
+    \case ~ P ~ (c_j ~ \Vec{a}) ~ \of ~ \langle c_i \Rightarrow d_i \rangle_i &\rhd_\iota d_i ~ \Vec{a} \\
+    \match ~ x.\Vec{y}.P ~ (c_j ~ \Vec{a}) ~ \with ~ \langle c_i ~ \Vec{z} \Rightarrow d_i \rangle_i &\rhd_\iota d_i[\Vec{z} \mapsto \Vec{a}]
+\end{align*}
+
+\subsection{Fixed Points}
+
+Case and match expressions are generally accompanied by a way to define recursive functions. When the function takes multiple arguments, one of them is deemed the \emph{decreasing argument}, and na\"ive termination checking would merely ensure that recursive calls occur only on components of the decreasing argument. For simplicity, we deal with functions that explicitly state the decreasing argument, starting with the \emph{fixpoint}, which binds the function to a constant.
+%
+\begin{mathpar}
+    \inferrule*[Right=fixpoint]{
+        \Gamma \vdash \Delta \to (x: I ~ \Vec{p} ~ \Vec{e}) \to P : \Type
+        \\\\
+        \Gamma \Delta (x: I ~ \Vec{p} ~ \Vec{e}) (f : \Delta \to (x : I ~ \Vec{p} ~ \Vec{e}) \to P) \vdash d : P
+    }{
+        \Gamma \vdash \fixpoint ~ f ~ \Delta ~ (x: I ~ \Vec{p} ~ \Vec{e}): P ~ \inn ~ d : \Delta \to (x : I ~ \Vec{p} ~ \Vec{e}) \to P
+    }
+\end{mathpar}
+
+The fixpoint is presented in a style similar to the match expression, where $d$ is the body of the fixpoint function rather than a function itself. The decreasing argument is bound to $x$ and all other arguments are bound to $\Delta$ inside of $d$, as well as the fixpoint $f$ itself. As a concrete example, the recursive function $\const{double}$ below doubles a natural, using a fixpoint function with a case expression.
+%
+\begin{align*}
+    &\const{double} : \Nat \to \Nat \\
+    &\const{double} = \\
+    &\quad \fixpoint ~ f ~ (n: \Nat): \Nat ~ \inn \\
+    &\qquad \case ~ (\lambda n: \Nat. ~ \Nat) ~ n ~ \of \\
+    &\quad\qquad \zero \Rightarrow \zero \\
+    &\quad\qquad \succ \Rightarrow \lambda m: \Nat. ~ \succ ~ (\succ ~ (f ~ m))
+\end{align*}
+
+We can also define recursion in a more traditional form using a \emph{fixed point operator} or \emph{combinator} that computes the least fixed point for a function that takes as argument an approximation of the fixed point.
+%
+\begin{mathpar}
+    \inferrule*[Right=fix]{
+        \Gamma \vdash d : (f : \Delta \to (x : I ~ \Vec{p} ~ \Vec{e}) \to P) \to \Delta \to (x : I ~ \Vec{p} ~ \Vec{e}) \to P
+    }{
+        \Gamma \vdash \fix ~ d : \Delta \to (x : I ~ \Vec{p} ~ \Vec{e}) \to P
+    }
+\end{mathpar}
+
+The argument $f$ in the function $d$ represents the entire fixed point itself, while $x$ and $\Delta$ are again the decreasing and other arguments. Notice that if let $T$ be the type of $\fix ~ d$, then we could alternatively treat $\fix$ as a function on a function (hence \emph{operator}/\emph{combinator}) whose type is $(T \to T) \to T$. We present again as example the recursive function $\const{double}$, this time using the fixed point operator and a match expression.
+%
+\begin{align*}
+    &\const{double} : \Nat \to \Nat \\
+    &\const{double} = \\
+    &\quad \fix ~ (\lambda f : \Nat \to \Nat. ~ \lambda n: \Nat. \\
+    &\qquad\qquad \match ~ x.\Nat ~ n ~ \with \\
+    &\quad\qquad\qquad \zero \Rightarrow \zero \\
+    &\quad\qquad\qquad \succ ~ m \Rightarrow \succ ~ (\succ ~ (f ~ m)))
+\end{align*}
+
+Although case expressions and fixed point operators have a more function-like presentation while match and fixpoint have a more pattern-like presentation, we are free to mix and match as we like. And just like case and match expressions, fixed point operators and fixpoints have untyped reduction rules that use function application and substitution, respectively. They are also referred to as \emph{$\mu$-reduction} rules.
+%
+\begin{align*}
+    (\fixpoint ~ f ~ \Delta ~ (x : I ~ \Vec{p} ~ \Vec{e}) : P ~ \inn ~ d) ~ \Vec{b} ~ (c ~ \Vec{a}) &\rhd_{\mu} d[f \mapsto \fixpoint ~ f ~ \Delta ~ (x : I ~ \Vec{p} ~ \Vec{e}) : P ~ \inn ~ d][\Delta \mapsto \Vec{b}][x \mapsto c ~ \Vec{a}] \\
+    (\fix ~ d) ~ \Vec{b} ~ (c ~ \Vec{a}) &\rhd_{\mu} d ~ (\fix ~ d) ~ \Vec{b} ~ (c ~ \Vec{a})
+\end{align*}
+
+\subsection{Eliminators}
+
+The data definitions we have seen are called \emph{inductive} because the elements of the inductive type are built up inductively. That is, starting with no elements at all, we look at our constructors and see what elements we can build at each step. For example, with the naturals, from no elements at all, we see that we can construct one element: $\zero$. Then at the next step, we can construct from that one element $(\succ ~ \zero)$, and so on. If an inductive type has a parameter $A$, then we begin the construction with all the elements of $A$. Considering the usual list type parameterize over some $A$, we first have $\nil$, then one step later, we have $(\cons ~ a ~ \nil)$ for every element $a : A$, and so forth.
+
+Often we wish to prove properties about the elements in our inductive types. In mathematics, to prove some property $P$, we use \emph{induction}: If we can show that for every possible constructor $c$, $P$ holding for the components of $c$ implies that $P$ holds for $c$ built out of those components, then $P$ must hold for \emph{all} elements of the inductive type. This idea is called the \emph{induction principle}, the \emph{elimination principle}, or simply the \emph{eliminator}, since it is used to eliminate a member of an inductive type into some other type. It's also called the \emph{recursor} as it computes recursively.
+
+In terms of types, $P$ is exactly the motive that we have seen in case and match expressions. For some inductive type $I$, beginning with parameters $\Delta_P$, we have $$P : \Delta_I \to (x : I ~ \Delta_P ~ \Delta_I) \to \Type.$$ This is also known as the \emph{major premise} of the eliminator \citep{inductive-families}. Now consider some constructor $$c_i : \Delta_{i} \to I ~ \Delta_P ~ \Vec{e}_i.$$ where $\Delta_i = \langle (x_{ij} : \Delta_{ij} \to D_{ij}) \rangle_j$ are the constructor's arguments. For the moment, suppose that $I$ is not a nested inductive type. This means that if $D_{ij} = I_{ij} ~ \Vec{p} ~ \Vec{e}_{ij}$, then $I$ does not appear in $\Vec{p}$.
+
+For each constructor $c_i$, we need the statement $P_i$ that if $P$ holds for all of its inductive arguments -- the \emph{induction hypotheses} -- then $P$ holds for the fully-applied $c_i$. These are the \emph{minor premises} of the eliminator \citep{inductive-families}. We will build the type step-by-step. First, we need to provide all of the arguments, and apply $P$ to the fully-applied constructor, as well as the indices of its type. $$P_i: \Delta_i \to \; ? \to P ~ \Vec{e}_i ~ (c_i ~ \Delta_i)$$ Now consider each argument $x_{ij}$ of $c_i$ and its type. If $D_{ij}$ is not an inductive type or it is and $I_{ij} \neq I$, then $x_{ij}$ is not a recursive argument, and $?$ is empty. Otherwise, if $I_{ij} = I$, then we need an inductive hypothesis $P_{ij}$. This takes all of the arguments in $\Delta_{ij}$, and has return type $P$ applied to a term of type $I ~ \Vec{p} ~ \Vec{e}_{ij}$. Luckily, $x_{ij}$ gives us exactly the term we need. $$P_{ij}: \Delta_{ij} \to P ~ \Vec{e}_{ij} ~ (x_{ij} ~ \Delta_{ij})$$ Then all we need to do is provide the minor premise with the inductive hypotheses $\Delta_{\mathbb{J}}$.
+%
+\begin{align*}
+    \mathbb{J} &= \{j \mid I_{ij} = I\} \\
+    \Delta_{\mathbb{J}} &= \langle (P_{ij} : \Delta_{ij} \to P ~ \Vec{e}_{ij} ~ (x_{ij} ~ \Delta_{ij})) \rangle_{j \in \mathbb{J}} \\
+    P_i &: \Delta_i \to \Delta_{\mathbb{J}} \to P ~ \Vec{e}_i ~ (c_i ~ \Delta_i)
+\end{align*}
+
+If $\Delta_{\mathbb{J}}$ is empty, then $P_i$ is a \emph{base case}; otherwise, it is a \emph{step case} \citep{inductive-families}. Finally, we collect together the parameters, the major premise (motive), the minor premises (base and step cases), the indices, and finally the target, and produce a return type of $P$ applied to the indices and the target. We also summarize the various components involved in the eliminator. While we present it as a type, it can also be presented as a typing rule by stating all of the eliminator's arguments as premises and the return type as the type of the fully-applied eliminator.
+
+\begin{align*}
+    \const{elim}_I : \Delta_P &\to (P : \Delta_I \to (x : I ~ \Delta_P ~ \Delta_I) \to \Type) \\
+    &\to \langle (P_i: \Delta_i \to \Delta_{i\mathbb{J}} \to P ~ \Vec{e}_i ~ (c_i ~ \Delta_i)) \rangle_i \\
+    &\to \Delta_I \to (x: I ~ \Delta_P ~ \Delta_I) \\
+    &\to P ~ \Delta_I ~ x \\
+    \text{\emph{where}} ~ i\mathbb{J} &= \{ j \mid I_{ij} = I \} \\
+    \Delta_{i\mathbb{J}} &= \langle (P_{ij} : \Delta_{ij} \to P ~ \Vec{e}_{ij} ~ (x_{ij} ~ \Delta_{ij})) \rangle_{j \in i\mathbb{J}} \\
+    D_{ij} &= I_{ij} ~ \Vec{p} ~ \Vec{e}_{ij} ~ \text{\emph{or}} ~ \Type ~ (\text{\emph{or} other base type})\\
+    \Delta_i &= \langle (x_{ij} : \Delta_{ij} \to D_{ij}) \rangle_j \\
+    c_i &: \Delta_i \to I ~ \Delta_P ~ \Vec{e}_i \\
+    I &: \Delta_P \to \Delta_I \to \Type
+\end{align*}
+%
+\begin{itemize}
+    \item $\Delta_P$, $\Delta_I$: Parameters and indices
+    \item $c_i$, $\Delta_i$, $\Vec{e}_i$: The $ith$ constructor, its arguments, and the indices of its inductive type
+    \item $P$, $P_i$: Major and minor premises
+    \item $\Delta_{\mathbb{J}}$: Inductive hypotheses
+    \item $\Vec{e}_{ij}, \Delta_{ij}$: Recursive argument indices and unnamed (arguments to the $j$th arguments of the $i$th constructor)
+\end{itemize}
+
+In terms of our discrimination--decomposition--recursion--termination model, the minor premises discriminate between the constructors, their arguments decompose the constructors, and recursion occurs in the inductive hypotheses. From the perspective of eliminators, a case expression is ``just an induction principle with its inductive hypotheses chopped off'' \citep{concon}. Termination is guaranteed to occur, because the recursive calls are always the same eliminator applied to the recursive arguments, as we can see in the computation rule below. However, this also means that eliminators are not as powerful or general as pattern-matching or fixpoints, where the recursive function may be called on any argument as long as it passes whatever termination checking is present.
+%
+\begin{mathpar}
+    \inferrule*[Right=comp]{
+        \Gamma \vdash \Vec{p} : \Delta_P
+        \and
+        \Gamma \vdash P : \Delta_I \to (x : I ~ \Delta_P ~ \Delta_I) \to \Type
+        \and
+        \Gamma \vdash P_i : \Delta_i \to \Delta_{i\mathbb{J}} \to P ~ \Vec{e_i} ~ (c_i ~ \Delta_i)
+        \\\\
+        \Gamma \vdash \Vec{e} : \Delta_I
+        \and
+        \Gamma \vdash \Vec{a} : \Delta_i
+        \and
+        \Gamma \vdash a_k : \Delta_k \to I ~ \Vec{p} ~ \Vec{e}_k
+    }{
+        \Gamma \vdash \const{elim}_I ~ \Vec{p} ~ P ~ \langle P_i \rangle_i ~ \Vec{e} ~ (c_j ~ \Vec{a}) \equiv P_j ~ \Vec{a} ~ \langle \lambda \Delta_{k}. ~ \const{elim}_I ~ \Vec{p} ~ P ~ \langle P_i \rangle_i ~ \Vec{e}_k ~ (a_k ~ \Delta_k) \rangle_{k \in j\mathbb{J}} : P ~ \Vec{e} ~ (c_j ~ \Vec{a})
+    }
+\end{mathpar}
+\iffalse
+\begin{align*}
+    \const{elim}_I ~ \Vec{p} ~ P ~ \langle P_i \rangle_i ~ \Vec{e} ~ (c_j ~ \langle \lambda \Delta_{k}. ~ a_k \rangle_k) &\rhd P_j ~ \langle \lambda \Delta_{k}. ~ a_k \rangle_k ~ \langle \lambda \Delta_{k}. ~ \const{elim}_I ~ \Vec{p} ~ P ~ \langle P_i \rangle_i ~ \Vec{e}_k ~ a_k \rangle_{k \in j\mathbb{J}}
+\end{align*}
+\fi
+
+For convenience, the typing premise for $\Vec{a}$ is stated twice for recursive arguments $a_k$. In this case, it should return the same inductive type $I$ with possibly different indices $\Vec{e}_k$. Notice that $\Vec{e}_k$ is used on the right-hand side of the computation rule, but doesn't appear on the left-hand side: this is not a rule we can state in generality as a simple untyped reduction rule.
+
+If $I$ \emph{is} a nested inductive type, then all hope is lost: there is no known general way to state the induction principle for a nested inductive definition. For particularly complex ones, these take some creativity to formulate, and are generally proven from the other methods of recursion.
+
+\subsection{Examples of Inductive Definitions and their Eliminators}
+
+For completeness, we begin with the simplest nontrivial inductive definition: the Peano naturals. We give the eliminators slightly different names from $\const{elim}_I$.
+%
+\begin{align*}
+    \data ~ \Nat &: \Type ~ \where \\
+    \zero &: \Nat \\
+    \succ &: \Nat \to \Nat
+\end{align*}
+%
+\begin{align*}
+    &\const{nrec} : (P : (n: \Nat) \to \Type) \to (pz: P ~ \zero) \\
+    &\qquad\to (ps: (n: \Nat) \to (pn: P ~ n) \to P ~ (\succ ~ n)) \\
+    &\qquad\to (n: \Nat) \to P ~ n \\
+    &\const{nrec} ~ P ~ pz ~ ps ~ (\zero) \coloneqq pz \\
+    &\const{nrec} ~ P ~ pz ~ ps ~ (\succ ~ n) \coloneqq ps ~ n ~ (\const{nrec} ~ P ~ pz ~ ps ~ n)
+\end{align*}
+
+This is the usual mathematical induction over natural numbers: we prove that some property holds for all naturals by first showing that it holds for zero, then by showing that if it holds for $n$ it will also hold for $n+1$. Now that we have the naturals, we are able to define the \emph{finite sets}, which are indexed by naturals.
+%
+\begin{align*}
+    \data ~ \Fin &: (n : \Nat) \to \Type ~ \where \\
+    \fzero &: (n: \Nat) \to \Fin ~ (\succ ~ n) \\
+    \fsucc &: (n: \Nat) \to (f: \Fin ~ n) \to \Fin ~ (\succ ~ n)
+\end{align*}
+%
+\begin{align*}
+    &\const{frec} : (P : (n: \Nat) \to (f: \Fin ~ n) \to \Type) \to (pfz: (n: \Nat) \to P ~ (\succ ~ n) ~ (\fzero ~ n)) \\
+    &\qquad\to (pfs: (n: \Nat) \to (f: \Fin ~ n) \to (pfn: P ~ n ~ f) \to P ~ (\succ ~ n) ~ (\fsucc ~ n ~ f)) \\
+    &\qquad\to (n: \Nat) \to (f: \Fin ~ n) \to P ~ n ~ f \\
+    &\const{frec} ~ P ~ pfz ~ pfs ~ (\succ ~ n) ~ (\fzero ~ n) \coloneqq pfz ~ (\succ ~ n) \\
+    &\const{frec} ~ P ~ pfz ~ pfs ~ (\succ ~ n) ~ (\fsucc ~ n ~ f) \coloneqq pfs ~ n ~ f ~ (\const{frec} ~ P ~ pfz ~ pfs ~ n ~ f)
+\end{align*}
+
+The type $\Fin ~ n$ represents the set of numbers no greater than $n$; the type has $n$ inhabitants. For instance, there are no possible elements of type $\Fin ~ \zero$; $\fzero ~ \zero$ is the only element of type $\Fin ~ (\succ ~ \zero)$; $\fzero ~ (\succ ~ \zero)$ and $\fsucc ~ (\succ ~ \zero) ~ (\fzero ~ \zero)$ are the only elements of type $\Fin ~ (\succ ~ (\succ ~ \zero))$; and so on.
+
+% TODO: Lists, Vectors, W types
+
+\section{W Types}
+
+\section{$\mu$ Types}
+
+\section{A Note on Notation}
+
+Throughout this section, a variety of different letters are used to mean different things in different contexts. We play fast and loose with the notational conventions because we aren't discussing \emph{one} type theory but rather the many different features a type theory might have and how they might appear. Even so, we catalogue here the primary uses of the letters and give a brief rundown of what should be fairly self-evident syntax.
+
+\begin{itemize}
+    \item Letters in \textit{italics} and Greek letters are metavariables, while names in \const{roman} are constants. % Remember to update this if the definition of \const ever changes.
+    \item $A, B, C, D, P, T$ are types.
+    \item $a, b, d, e, p, q$ are terms (also referred to as expressions). $p, q$ in particular are proofs of propositional equality, or ``paths''.
+    \item $c$ is a constructor name, and $I$ is an inductive type name.
+    \item $f, g, x, y, z$ are variables in the implicit language, often $f, g$ for functions.
+    \item $n, m$ are naturals in the implicit metalanguage, used as an index to denote the lengths of sequences. For instance, $\Vec{a} = a_1 \dots a_n$ is a sequence of $n$ terms.
+    \item $i, j, k$ are index metavariables used as an index to denote some member of a sequence, so that $1 \leq i \leq n$ or the like is taken implicitly. For instance, $a_i$ is the $i$th member of $\Vec{a}$, and $c_i$ is the $i$th $c$ of the sequence $\langle c_i \Rightarrow d_i \rangle_i = (c_1 \Rightarrow d_1) \dots (c_n \Rightarrow d_n)$. In fact, $\Vec{a}$ would merely be syntactic sugar for $\langle a_i \rangle_i$.
+    \item $k, \ell$ are naturals in the implicit metalanguage, used as universe levels.
+    \item $\mathbb{I}, \mathbb{J}$ are sets of naturals.
+    \item $=$ is used as both an equality in the metalanguage, usually for some sort of alpha-equivalent syntactic equality, and as the propositional equality type. $\coloneqq$ is a definitional equality, binding some constant to a term, possibly with pattern-matching. Finally, $\equiv$ is judgemental equality, determined by judgement rules.
+\end{itemize}
+
+% TODO:
+% * eliminators
+% * W types using inductive types
+% * mu types???
+
+\chapter{Notions of Equality}
+\section{An Identity Crisis}
+
+\epigraph{There is so much about equality.\\ I feel like 99\% of type theory is about equality.}{\textit{@jordyd@octodon.social}}
+
+The most archetypical example demonstrating the capabilities of dependent types is perhaps the \emph{identity type}.\footnote{In this house we do not speak of the indexed vector.} In proof assistants such as Coq, Agda, or Idris, we may see it defined as follows:
+
+\begin{align*}
+    \data ~ (=) &: (A : \Type) \to (a, b : A) \to \Type ~ \where \\
+    \refl &: (A : \Type) \to (a : A) \to a =_A a
+\end{align*}
+
+The only constructor the identity type has is a proof of reflexivity, which states that any given term is equal to itself. This makes perfect sense, but it doesn't appear to be any way to prove equality of anything else. You carry on nonetheless, and endeavour to prove the other two properties of an equivalence relation: symmetry and transitivity.
+
+\begin{align*}
+    \text{sym} &: (A : \Type) \to (a, b : A) \to a =_A b \to b =_A a \\
+    \text{sym} &~ A ~ a ~ a ~ \refl_a \equiv \refl_a \\
+    \\
+    \text{trans} &: (A : \Type) \to (a, b, c : A) \to a =_A b \to b =_A c \to a =_A c \\
+    \text{trans} &~ A ~ a ~ a ~ a ~ \refl_a ~ \refl_a \equiv \refl_a
+\end{align*}
+
+This seems superfluous, almost, since matching on equalities can only yield the fact that things that are equal must be the same, so there is not much to do. And so you proceed, accumulating more and more properties of equality, eventually discovering proof by induction, and you go on your merry way. But all in all, this equality business seems like a rather simple thing. Until it isn't.
+
+Dive deep enough and you may find yourself surrounded by people who regularly sling around technical phrases and names like \emph{intentional} and \emph{extensional} type theory, \emph{definitional} and \emph{propositional} equality (isn't there just the one equality?), \emph{Martin-L\"of} and \emph{John Major} (clearly both very prominent type theorists, as far as you can tell from context), and \emph{\jelim} and \emph{\kelim eliminators}. Sometimes it's an axiom. Sometimes many things are axioms. But most importantly, somehow every one of these have to do with the notion of identity. It's a veritable zoo of equality.
+
+% TODOs:
+% * Update the intro above now that this document is more than just equality
+% * Introduce the usual inductive definition of the identity type
+% * Fix prose of below section to reflect that we've already introduced it
+% * Introduce all of the fancy words we will cover
+
+\section{Dependent Eliminators}
+
+You've seen the definition of the identity type. It's part of the first exhibit, the \emph{inductive data types}. The general syntax of these definitions can be expressed as:\footnote{For now, we ignore the \emph{parameters} of the data types, and consider only the \emph{indices} $\Delta_I$.}
+%
+\begin{align*}
+    \data ~ I &: \Delta_I \to \Type ~ \where \\
+    \langle c_i &: \Delta_i \to I~\Vec{e}_i \rangle_i
+\end{align*}
+
+where $\Delta = (x_1 : A_1) \to \dots \to (x_n : A_n)$, some sequence of type bindings, and we write $|\Delta| = \Vec{x}_i$. Here, $\Delta_I$ are the arguments to the inductive type $I$, and each $\Delta_i$ are the arguments to the constructor $c_i$. Just as there are constructors, we also have destructors; we will first consider \emph{case expressions} as they are defined in CIC, Coq's core calculus. The typing rule for case expressions is:
+%
+\begin{mathpar}
+    \inferrule*[Right=case]{
+        \Gamma \vdash P : \Delta_I \to (p : I ~ |\Delta_I|) \to \Type \\
+        \Gamma \vdash p : I ~ \Vec{a} \\
+        \Gamma \vdash d_i : \Delta_i \to P ~ \Vec{e}_i ~ (c_i ~ |\Delta_i|)
+    }{
+        \Gamma \vdash \case_P ~ p ~ \of ~ \langle c_i \Rightarrow d_i \rangle_i : P ~ \Vec{a} ~ p
+    }
+\end{mathpar}
+
+$P$ is aptly named the \emph{motive}, which is the goal statement that we wish to prove, given some inductive construction and its inductive type's arguments. $p$ is the \emph{target}, the construction we wish to destruct. Finally, for each constructor $c_i$ of $I$, we have a \emph{branch} $d_i$, which takes the constructor's arguments and returns the appropriate proof of $P$. The syntax of the case expression should be familiar, except perhaps for $P$. The motive is usually inferred by the proof assistant, which is a lot easier when it doesn't depend on the inductive type arguments or the target. In fact, if we consider the \emph{nondependent} case expression, the typing rule is simplified greatly:
+%
+\begin{mathpar}
+    \inferrule*[Right=case-nondep]{
+        \Gamma \vdash p : I ~ \Vec{a} \\
+        \Gamma \vdash d_i : \Delta_i \to P
+    }{
+        \Gamma \vdash \case ~ p ~ \of ~ \langle c_i \Rightarrow d_i \rangle_i : P
+    }
+\end{mathpar}
+
+We pause here to note that so far we have three parts to our inductive type feature:
+
+\begin{enumerate}
+    \item The \textbf{formation rules} for an inductive type $I$, in the first line of the data definition;
+    \item The \textbf{introduction rules} to \emph{build} elements of type $I$, in the second line of the data definition; and
+    \item The \textbf{elimination rules} to \emph{use} elements of type $I$, or our case rule.
+\end{enumerate}
+
+These rules tell us how to make (well-typed) terms of our language. Most language features follow this pattern; for instance, with functions, we have the formation rule as the function type $\Pi(x:T).U$, the introduction rule as functions $\lambda x:T.e$, and the elimination rule as function application $f ~ a$ for some function $f$ and argument $a$. But we are missing one more rule, which tells us how the introduction and elimination rules fit together:
+
+\begin{enumerate}\setcounter{enumi}{3}
+    \item The \textbf{computation rule}, which tells us how destructor destructs a construction.
+\end{enumerate}
+
+This is also known as the reduction or rewrite rule. For functions, this is the usual $\beta$-reduction. For inductive types, it is $\iota$-reduction:
+%
+\begin{align*}
+    \case_P ~ (c_j ~ \Vec{b}) ~ \of ~ \langle c_i \Rightarrow d_i \rangle_i \rhd_\iota d_j ~ \Vec{b}
+\end{align*}
+
+This is all fine and dandy if we were using Coq, but if we were using Agda or Idris instead, we have one additional feature in our toolbox: \emph{pattern-matching}. This allows us to define functions on inductive types by considering only those cases where a syntactic constructor is passed to the function. This sounds a lot like the elimination and computation rules, which begs the question: Can we define them using a pattern-matching function? The answer is \emph{yes}, and we can do so systematically using the elimination rule. If we consider each premise of \refrule{case} as an argument and the type of the case expression as our return type, we have the following function signature (with some reordering):
+%
+\begin{align*}
+    \elim_I &: (P : \Delta_I \to (p : I ~ |\Delta_i|) \to \Type) \\
+    &\to (d_i : \Delta_i \to P ~ \Vec{e}_i ~ (c_i ~ |\Delta_i|))_i \\
+    &\to \Delta_I \to (p : I ~ |\Delta_I|) \\
+    &\to P ~ |\Delta_i| ~ p
+\end{align*}
+
+The only significant change is that we've abstracted the inductive type's arguments $\Vec{a}$ as $\Delta_I$ in order to use them in both the target's type and the return type. We then implement this function by pattern-matching on the target $p$:
+%
+\begin{align*}
+    \elim_I ~ P ~ \Vec{d}_i ~ \Vec{a} ~ (c_j ~ \Vec{b}) \equiv d_j ~ \Vec{b}
+\end{align*}
+
+This function is called the \emph{eliminator} for inductive types, and together with pattern-matching encompasses the elimination and computation rules.
+
+We now revisit the identity type, which is also called \emph{Martin-L\"of identity}, \emph{propositional equality}, \emph{homogenous equality}, or simply \emph{equality}.
+%
+\begin{align*}
+    \data ~ (=) &: (A : \Type) \to (a, b : A) \to \Type ~ \where \\
+    \refl &: (A : \Type) \to (a : A) \to a =_A a
+\end{align*}
+
+Recall that the only constructor of the identity type is \refl, which is a proof of equality reflexivity. In other words, two terms are equal if they evaluate to the same thing (which is also a notion with many names). Specializing the inductive eliminator to the identity type, we have:
+%
+\begin{align*}
+    \elim_= &: (P : (A : \Type) \to (a, b : A) \to (p : a =_A b) \to \Type) \\
+    &\to (d : (A : \Type) \to (a : A) \to P ~ A ~ a ~ a ~ \refl_a) \\
+    &\to (A : \Type) \to (a, b : A) \to (p : a =_A b) \\
+    &\to P ~ A ~ a ~ b ~ p \\
+    \elim_= &~ P ~ d ~ A ~ a ~ a ~ \refl_a \equiv d ~ A ~ a
+\end{align*}
+
+Since $P$ and $d$ are only ever applied to $A$, we can move $A$ to the beginning as our first argument. Then the eliminator takes the form of what is traditionally called the \emph{\jelim eliminator} for identity types.
+%
+\begin{align*}
+    \jelim &: (A : \Type) \to (P : (a, b : A) \to (p : a =_A b) \to \Type) \\
+    &\to (d : (a : A) \to P ~ a ~ a ~ \refl_a) \\
+    &\to (a, b : A) \to (p : a =_A b) \\
+    &\to P ~ a ~ b ~ p \\
+    \jelim &~ A ~ P ~ d ~ a ~ a ~ \refl_a \equiv d ~ a
+\end{align*}
+
+You may notice the redundancy in having two identical arguments due to $\refl_a$ enforcing that $a$ and $b$ be the same. And intuitively, two terms should be equal only if they are the same, so why should $p$ be an equality across two distinct variables? As it turns out, we can define using pattern-matching a similar function called the \emph{\kelim eliminator} that acts on equalities of identical terms.
+%
+\begin{align*}
+    \kelim & : (A : \Type) \to (a : A) \to (P : (p : a =_A a) \to \Type) \\
+    &\to (d : P ~ \refl_a) \to (p : a =_A a) \to P ~ p \\
+    \kelim &~ A ~ a ~ P ~ d ~ \refl_a \equiv d
+\end{align*}
+
+\section{Definitions of Equality}
+
+\subsection{Definitional Equality}
+
+Notice that in the function definitions above, we use a different, more ``fundamental'' equality, denoted with $\equiv$. This point deserves repeating: the equality $\equiv$ is \textbf{not} the same as the identity type $=$. This equality is called \emph{definitional equality}, \emph{judgemental equality}, or  \emph{computational equality}. Many complex type systems tend to separate definitional equality into \emph{reduction rules}, \emph{conversion rules}, and possibly more, but since they all deal with the issue of when two terms are ``the same'', we will refer to all their relevant rules uniformly as definitional equality.\footnote{In particular, we will be ignoring \emph{congruence rules}.} A type system will then consist of three kinds of judgement forms:
+
+\begin{itemize}
+    \item $\vdash \Gamma$, which indicates when a context is well-formed;
+    \item $\Gamma \vdash a : A$, which indicates when a term is well-typed; and
+    \item $\Gamma \vdash a \equiv b : A$, which indicates when two terms are definitionally equal.
+\end{itemize}
+
+We omit the well-formedness rules and their appearance in the premises, since where they occur is a topic for another day. We assume the usual typing rules for functions. Finally, we also have the following definitional equality rules outside of those from computational rules.
+%
+\begin{mathpar}
+    \inferrule*[right=refl]{
+        \Gamma \vdash a : A
+    }{
+        \Gamma \vdash a \equiv a : A
+    }
+
+    \inferrule*[right=sym]{
+        \Gamma \vdash a \equiv b : A
+    }{
+        \Gamma \vdash b \equiv a : A
+    }
+
+    \inferrule*[right=trans]{
+        \Gamma \vdash a \equiv b : A \\\\
+        \Gamma \vdash b \equiv c : A
+    }{
+        \Gamma \vdash a \equiv c : A
+    }
+
+    \inferrule*[Right=conv]{
+        \Gamma \vdash a \equiv b : A \\\\
+        \Gamma \vdash A \equiv B : \Type
+    }{
+        \Gamma \vdash a \equiv b : B
+    }
+\end{mathpar}
+
+\subsection{Propositional Equality}
+
+We now redefine propositional equality in terms of our typing judgements instead of using an inductive definition. Recall that we have a formation rule, an introduction rule, an elimination rule, and a computation rule\footnote{The arguments to the \jelim eliminator can be reordered so that $P$ is abstracted only over $b$ and $d$ is no longer a function. This is called the \emph{Paulin-Mohring eliminator}; see \citet{jk-hott} for further details.}. The first three are typing judgements, while the last is a definitional equality rule.
+%
+\begin{mathpar}
+    \inferrule*[right={$=$}-form]{
+        \Gamma \vdash A : \Type \\\\
+        \Gamma \vdash a : A \\
+        \Gamma \vdash b : A
+    }{
+        \Gamma \vdash a =_A b : \Type
+    }
+
+    \inferrule*[right={$=$}-intro]{
+        \Gamma \vdash A : \Type \\
+        \Gamma \vdash a : A
+    }{
+        \Gamma \vdash \refl_a : a =_A a
+    }
+
+    \inferrule*[right={$=$}-elim]{
+        \Gamma \vdash A : \Type \\
+        \Gamma \vdash P : (a, b : A) \to (p : a =_A b) \to \Type \\
+        \Gamma \vdash d : (a : A) \to P ~ a ~ a ~ \refl_a \\
+        \Gamma \vdash a : A \\
+        \Gamma \vdash b : A \\
+        \Gamma \vdash p : a =_A b \\
+    }{
+        \Gamma \vdash \jelim ~ A ~ P ~ d ~ a ~ b ~ p : P ~ a ~ b ~ p
+    }
+
+    \inferrule*[right={$=$}-comp]{
+        \Gamma \vdash A : \Type \\
+        \Gamma \vdash P : (a, b : A) \to (p : a =_A b) \to \Type \\
+        \Gamma \vdash d : (a : A) \to P ~ a ~ a ~ \refl_a \\
+        \Gamma \vdash a : A \\
+    }{
+        \Gamma \vdash \jelim ~ A ~ P ~ d ~ a ~ a ~ \refl_a \equiv d ~ a : P ~ a ~ a ~ \refl_a
+    }
+\end{mathpar}
+
+For completeness, we provide also the elimination and computation rules for the \kelim eliminator. Henceforth we also assume that the arguments to the computation rules are well-typed as in the elimination rule and omit identical premises with $\dots$.
+%
+\begin{mathpar}
+     \inferrule*[right={$=$}-elim-K]{
+        \Gamma \vdash A : \Type \\
+        \Gamma \vdash a : A \\\\
+        \Gamma \vdash P : (p : a =_A a) \to \Type \\\\
+        \Gamma \vdash d : P ~ \refl_a \\
+        \Gamma \vdash p : a =_A a \\
+     }{
+        \Gamma \vdash \kelim ~ A ~ a ~ P ~ d ~ p : P ~ p
+     }
+     
+     \inferrule*[right={$=$-comp-K}]{\dots}{
+        \Gamma \vdash \kelim ~ A ~ a ~ P ~ d ~ \refl_a \equiv d : P ~ \refl_a
+     }
+\end{mathpar}
+
+The \kelim is important because as opposed to \jelim, we can prove the \emph{unicity} or \emph{uniqueness of identity proofs} (\uip), which states that all proofs of equality are equal one another. We first prove that all proofs of equality are equal to \refl, which we name \rip, as the provided proof of equality is on the right side. (Correspondingly, we name the symmetric variant \lip.) Then \uip can be proven either by an application of \jelim, or by symmetry and transitivity.
+%
+\begin{align*}
+    \rip &: (A : \Type) \to (a : A) \to (q : a =_A a) \to \refl_a = q \\
+    \rip &~ A ~ a ~ q \coloneqq \kelim ~ A ~ a ~ (\lambda q : a =_A a. ~ \refl_a = q) ~ (\lambda a : A. ~ \refl_{\refl_a}) ~ q \\
+    \\
+    \uip &: (A : \Type) \to (a, b : A) \to (p, q : a =_A b) \to p = q \\
+    \uip &~ A ~ a ~ b ~ p ~ q \coloneqq \jelim ~ A ~ (\lambda a, b: A. ~ \lambda p: a =_A b. ~ (q: a =_A b) \to p = q) ~ (\lambda a: A. ~ \rip ~ A ~ a) ~ a ~ b ~ p ~ q
+\end{align*}
+
+We use $\coloneqq$ for definitional equalities of functions that can be written as lambda abstractions (in this case, $\rip \equiv \lambda A. ~ \lambda a. ~ \lambda q. ~ \dots$) and we may omit type annotations or term subscripts for clarity.
+
+\subsection{Heterogenous Equality}
+
+In the previous section we mentioned that propositional equality is also called homogenous equality.%
+\footnote{``Heterogenous'' and ``homogenous'' are actually newer variant spellings of ``heterogeneous'' and ``homogeneous''; we will stick to the former spelling.}
+This is because there is a different form of propositional equality where the terms on either side of the equality may not have the same type, called \emph{heterogenous equality} or \emph{John Major equality}.%
+\footnote{Unlike Martin-L\"of equality, John Major equality was not created by some John Major. The name was coined by Conor McBride for obscure political British reasons because he's just {\NotoEmoji \symbol{"1F336}} spicy {\NotoEmoji \symbol{"1F336}} like that.}
+This definition is still intuitively valid, since the only constructor we have for the equality is still reflexivity.
+%
+\begin{mathpar}
+     \inferrule*[right={$\stareq$}-form]{
+        \Gamma \vdash A : \Type \\
+        \Gamma \vdash B : \Type \\\\
+        \Gamma \vdash a : A \\
+        \Gamma \vdash b : B
+    }{
+        \Gamma \vdash a \stareq^A_B b : \Type
+    }
+
+    \inferrule*[right={$\stareq$}-intro]{
+        \Gamma \vdash A : \Type \\
+        \Gamma \vdash a : A
+    }{
+        \Gamma \vdash \refl^\star_a : a \stareq^A_A a
+    }
+
+    \inferrule*[right={$\stareq$}-elim]{
+        \Gamma \vdash P : (A : \Type) \to (B : \Type) \to (a : A) \to (b : B) \to (p : a \stareq^A_B b) \to \Type \\
+        \Gamma \vdash d : (A : \Type) \to (a : A) \to P ~ A ~ A ~ a ~ a ~ \refl^*_a \\
+        \Gamma \vdash A : \Type \\
+        \Gamma \vdash B : \Type \\
+        \Gamma \vdash a : A \\
+        \Gamma \vdash b : B \\
+        \Gamma \vdash p : a \stareq^A_B b \\
+    }{
+        \Gamma \vdash \jelim^\star ~ P ~ d ~ A ~ B ~ a ~ b ~ p : P ~ A ~ B ~ a ~ b ~ p
+    }
+
+    \inferrule*[right={$\stareq$}-comp]{\dots}{
+        \Gamma \vdash \jelim^\star ~ A ~ P ~ d ~ A ~ A ~ a ~ a ~ \refl^\star_a \equiv d ~ a : P ~ A ~ A ~ a ~ a ~ \refl^\star_a
+    }
+\end{mathpar}
+
+An interesting property of heterogenous equality is that we can prove \rip (for $\stareq$, evidently) directly from $\jelim^\star$.
+
+\begin{align*}
+    \rip^\star &: (A, B : \Type) \to (a : A) \to (b : B) \to (q : a \stareq^A_B b) \to \refl_a \stareq q \\
+    \rip^\star &~ A ~ B ~ a ~ b ~ q \coloneqq \jelim^\star ~ (\lambda A, B, a, b. ~ \lambda q : a \stareq^A_B b. ~ \refl^\star_a \stareq q) ~ (\lambda A, a. ~ \refl^\star_{\refl^\star_a}) ~ A ~ B ~ a ~ b ~ q
+\end{align*}
+
+The key is the heterogenous equality used in $\refl^\star_a \stareq q$: The term on the left has type $a \stareq^A_A a$, whereas the term on the right has type $a \stareq^A_B b$. In the homogenous version of \jelim, we would have to equate a term of type $a =_A a$ to a term of type $a =_A b$, which isn't possible with homogenous equality. In general, anything provable using \jelim can also be proven with $\jelim^\star$, but not the other way around.
+
+\subsection{Extensional Equality}
+
+So far, with all of our propositional equalities, definitional equality remains \emph{intensional}, as opposed to \emph{extensional}, which roughly means that everything that is provably (propositionally) equal is (definitionally) equal. An important property to note is that type checking is decidable for intensional definitional equality (which we refer to as computational equality) and undecidable for \emph{extensional} definitional equality (which we refer to as judgemental equality).%
+\footnote{Different sources assign different meanings to these terms. For instance, \citet{nlab-equality} distinguishes between definitional equality, which behaves merely like our $\coloneqq$, and computational equality, which describes a unidirectional notion of evaluation. \citet{ext-concepts}, on the other hand, says:
+\begin{quote}
+    Summing up, we can say that definitional equality is intensional--it identifies objects which become identical upon definitional expansion and/or computation...
+\end{quote}
+And on the topic of extensional equality:
+\begin{quote}
+    Strictly speaking, definitional equality does not become extensional here, but the equality judgement no longer expresses definitional equality. To avoid of a third notion of equality, \emph{judgemental equality}, we shall...
+\end{quote}
+Meanwhile, the HoTT book \citep{hott-book} uses definitional and judgemental equality interchangeably.}
+
+There are several ways to make definitional equality extensional. The simplest is by \emph{equality reflection}, which turns a propositional equality into a definitional one. This is a new rule for the definitional equality judgement form, but it doesn't really correspond to a notion of "computation"; it also acts like an elimination rule since it eliminates a propositional equality in the premises, but it doesn't create a new eliminator form either. We define it below for homogenous equality, although it applies to heterogenous equality as well. We also modify the introduction rule for propositional equality so that we can freely translate between definitional and propositional equalities.
+%
+\begin{mathpar}
+    \inferrule*[right={$=$}-reflect]{
+        \Gamma \vdash A : \Type \\
+        \Gamma \vdash a : A \\\\
+        \Gamma \vdash b : A \\
+        \Gamma \vdash p : a =_A b
+    }{
+        \Gamma \vdash a \equiv b : A
+    }
+
+    \inferrule*[right={$=$}-intro]{
+        \Gamma \vdash A : \Type \\
+        \Gamma \vdash a : A \\\\
+        \Gamma \vdash b : A \\
+        \Gamma \vdash a \equiv b : A
+    }{
+        \Gamma \vdash \refl : a =_A b
+    }
+\end{mathpar}
+
+We can see this renders type checking undecidable because checking whether two arbitrary terms $a, b$ are definitional equal amounts to doing a proof search for propositional equality.
+
+A second way of making definitional equality extensional is to include what is known as a \emph{uniqueness rule} or an \emph{$\eta$-expansion} rule. Whereas a computation rule describes how a destructor acts on a constructor, a uniqueness rule describes how a constructor builds a term from destructed components. For example, the $\eta$-expansion rule for functions states that $(\lambda x:A. ~ f ~ x) \equiv f$, while for pairs it states that $(\fst ~ x, \snd ~ x) \equiv x$. Since we have dependent elimination, the general formulation is:
+%
+\begin{mathpar}
+    \inferrule*[right={$=$}-uniq]{
+        \dots \\
+        \Gamma \vdash e : (a, b : A) \to (p : a =_A b) \to P ~ a ~ b ~ p
+    }{
+        \Gamma \vdash \jelim ~ A ~ P ~ (\lambda a : A. ~ e ~ a ~ a ~ \refl_a) ~ a ~ b ~ p \equiv e ~ a ~ b ~ p : P ~ a ~ b ~ p
+    }
+\end{mathpar}
+
+Using this rule, given some equality $p : a =_A b$, we can also obtain a definitional equality between $a$ and $b$. We first define the following functions:
+%
+\begin{align*}
+    &P : (a, b : A) \to (p : a =_A b) \to \Type \\
+    &P ~ a ~ b ~ p \coloneqq A \\
+    \\
+    &e_l :(a, b : A) \to (p : a =_A b) \to P ~ a ~ b ~ p \\
+    &e_l ~ a ~ b ~ p \coloneqq a \\
+    \\
+    &e_r :(a, b : A) \to (p : a =_A b) \to P ~ a ~ b ~ p \\
+    &e_r ~ a ~ b ~ p \coloneqq b
+\end{align*}
+
+Now we can derive a definitional equality between $a$ and $b$ in type $A$ up to congruence:
+%
+\begin{align*}
+    a &\equiv e_l ~ a ~ b ~ p &(\text{by $\beta$-reduction}) \\
+    &\equiv \jelim ~ A ~ P ~ (\lambda a : A. ~ e_l ~ a ~ a ~ \refl_a) ~ a ~ b ~ p &(\text{by \refrule{$=$-uniq}}) \\
+    &\equiv \jelim ~ A ~ P ~ (\lambda a : A. ~ a) ~ a ~ b ~ p &(\text{by $\beta$-reduction}) \\
+    &\equiv \jelim ~ A ~ P ~ (\lambda a : A. ~ e_r ~ a ~ a ~ \refl_a) ~ a ~ b ~ p &(\text{by $\beta$-reduction}) \\
+    &\equiv e_r ~ a ~ b ~ p &(\text{by \refrule{$=$-uniq}}) \\
+    &\equiv b &(\text{by $\beta$-reduction})
+\end{align*}
+
+Since there exists a derivation tree to $a \equiv b : A$ from $a =_A b$, we can see that \refrule{$=$-uniq} suffers from the same undecidability problem as \refrule{$=$-reflect}.
+
+\subsection{Summary}
+
+The below tree summarizes the relationships between the various definitions of equality. Again, the use of the terms ``computational equality'' and ``judgemental'' equality here are nonstandard.
+
+\digraph[scale=0.6]{}{
+  splines=line
+  nodesep=0.75
+  ranksep=0.5
+
+  equality [shape=rect]
+  definitional [shape=rect]
+  propositional [shape=rect]
+  computational [shape=rect]
+  judgemental [shape=rect]
+  ML [label="homogenous/
+Martin-Lof", shape=rect]
+  JM [label="heterogenous/
+John Major", shape=rect]
+  "J eliminator" [shape=egg]
+  "K eliminator" [shape=egg]
+  ER [label="equality
+reflection", shape=egg]
+  UR [label="uniqueness
+rule", shape=egg]
+  equality -> definitional [headlabel="judgement form", labeldistance=4, labelangle=90]
+  equality -> propositional [label="typing rules"]
+  definitional -> computational [headlabel="intensional", labeldistance=3, labelangle=60]
+  definitional -> judgemental [label="extensional"]
+  judgemental -> ER
+  judgemental -> UR
+  propositional -> JM [label="different types"]
+  propositional -> ML [headlabel="same types", labeldistance=4, labelangle=55]
+  ML -> "J eliminator"
+  ML -> "K eliminator"
+}
+
+\section{Properties of Propositional Equality}
+
+There are a few well-known properties of homogenous (and therefore heterogenous) equality that we state here without proof, which can be defined using \jelim or pattern-matching on \refl. First, we reassert that equality is an equivalence relation that is symmetric and transitive as well as reflexive. If an equality between $a$ and $b$ is viewed as a path between points $a$ and $b$ in some type space $A$, then these are also called \emph{inversion} and \emph{concatenation} (or \emph{composition}).
+%
+\begin{align*}
+    \text{sym} &: (A : \Type) \to (a, b : A) \to a =_A b \to b =_A a \\
+    \text{trans} &: (A : \Type) \to (a, b, c : A) \to a =_A b \to b =_A c \to a =_A c
+\end{align*}
+
+Equality also satisfies \emph{congruence} and \emph{substitution}. From the path perspective, these are named \emph{ap} (since a function is \emph{applied} to both ends) and \emph{transport} (since you move from one endpoint to the other). We name the function application version of congruence as \emph{happly} for homotopy reasons we will never discuss. It's worth noting that a dependent function can be applied in cong if the equality is heterogenous. The heterogenous versions $\text{happly}^\star$ and $\subst^\star$ merely replace the homogenous equality by a heterogenous one.
+%
+\begin{align*}
+    \text{cong} &: (A, B : \Type) \to (f : A \to B) \to (a, b : A) \to a =_A b \to f ~ a =_B f ~ b \\
+    \text{cong}^\star &: (A : \Type) \to (B : A \to \Type) \to (f : (a : A) \to B ~ a) \to (a, b : A) \to a \stareq^A_A b \to f ~ a \stareq^{Ba}_{Bb} f ~ b \\
+    \text{happly} &: (A : \Type) \to (B : A \to \Type) \to (f, g : (a : A) \to B ~ a) \to f = g \to (a : A) \to f ~ a =_{B a} g ~ a \\
+    \subst &: (A : \Type) \to (P : A \to \Type) \to (a, b : A) \to a =_A b \to P ~ a \to P ~ b
+\end{align*}
+
+An interesting consequence is that we can now define the heterogenous version of the \kelim eliminator using nothing but proofs derived from $\jelim^\star$:
+%
+\begin{align*}
+    \kelim^\star &: (A : \Type) \to (a : A) \to (P : (p : a \stareq^A_A a) \to \Type) \to (d : P ~ \refl^\star_a) \to (p : a \stareq^A_A a) \to P ~ p \\
+    \kelim^\star &~ A ~ a  ~ P ~ d ~ p \coloneqq \subst^\star ~ A ~ P ~ \refl^\star_a ~ p ~ (\rip^\star ~ A ~ A ~ a ~ a ~ p) ~ d
+\end{align*}
+
+As opposed to \kelim, which \emph{cannot} be derived from \jelim, $\kelim^\star$ \emph{can} be derived from $\jelim^\star$. All of this from merely declaring that equality may be written with two types!
+
+\section{Extensional Concepts}
+
+As we have seen with equality reflection, we can add various rules to the type theory to obtain different properties when it comes to definitional and propositional equality; however, that rule in particular has the nasty property of causing the undecidability of type checking. Luckily, there are other rules
+that are not as nasty that also bring to the type theory some notion of extensionality%
+\footnote{In fact, \citet{ext-concepts} shows that adding equality reflection is a \emph{conservative extension} of the same type theory with these other rules, in that they are both able to assign types to exactly the same terms and no more.}, % TODO: Move this into the actual text
+in the set-theoretical sense we will never discuss.
+
+\iffalse
+\subsection{Propositional Extensionality}
+
+Propositional extensionality states that if two terms are propositionally equal, then there is only one proof of this equality\footnote{Of no relation to the \emph{other} propositional extensionality, which states that two logically equivalent propositions (for some definition of ``proposition'') are propositionally equal.}. This is usually stated as the \emph{uniqueness of identity proofs}:
+%
+\begin{mathpar}
+    \inferrule*[right=UIP]{
+        \Gamma \vdash A : \Type \\
+        \Gamma \vdash a : A \\
+        \Gamma \vdash b : A \\
+        \Gamma \vdash p : a =_A a \\
+        \Gamma \vdash q : a =_A a \\
+    }{
+        \Gamma \vdash \uip ~ A ~ a ~ b ~ p ~ q : p = q    
+    }
+
+    \inferrule*[right=UIP-comp]{\dots}{
+        \Gamma \vdash \uip ~ A ~ a ~ a ~ \refl_a ~ \refl_a \equiv \refl_{\refl_a}
+    }
+\end{mathpar}
+
+(We may omit the type subscript of propositional equality and the term subscript of \refl\ for clarity.) However, we don't necessarily need a computation rule for \uip, since it turns out it can be defined from \kelim. First, we show that every proof of equality is equal to \refl:
+%
+\begin{align*}
+    \rip &: (A : \Type) \to (a : A) \to (q : a =_A a) \to \refl_a = q \\
+    \rip &~ A ~ a ~ q \coloneqq \kelim ~ A ~ a ~ (\lambda q : a =_A a. ~ \refl_a = q) ~ (\lambda a : A. ~ \refl) ~ q
+\end{align*}
+
+Then \uip can be shown from \rip using \jelim.
+%
+\begin{align*}
+    \uip &: (A : \Type) \to (a, b : A) \to (p, q : a =_A a) \to p = q \\
+    \uip &~ A ~ a ~ b ~ p ~ q \coloneqq \jelim ~ A ~ (\lambda a : A. ~ \lambda b : A. ~ \lambda p : a =_A b. ~ (q : a =_A b) \to p = q) ~ (\rip ~ A) ~ a ~ b ~ p ~ q
+\end{align*}
+\fi
+
+\subsection{Definitional \uip}
+
+Our current formulations of \rip define it as a function that returns a proof of propositional equality between $\refl_a$ and any $p : a =_A a$. This can be formulated as a \emph{definitional} equality as well with a new rule (and correspondingly for heterogenous equality). Alternatively, we can instead formulate a definitional \uip rule, which is what most type theories would do, then prove \rip from \uip, but we stick to \rip since it's easier to use.
+%
+\begin{mathpar}
+    \inferrule*[right=\rip]{
+        \Gamma \vdash A : \Type \\
+        \Gamma \vdash a : A \\\\
+        \Gamma \vdash b : A \\
+        \Gamma \vdash p : a =_A b
+    }{
+        \Gamma \vdash \refl_a \equiv p : a =_A b
+    }
+
+    \inferrule*[right=$\rip^\star$]{
+        \Gamma \vdash A : \Type \\
+        \Gamma \vdash B : \Type \\\\
+        \Gamma \vdash a : A \\
+        \Gamma \vdash b : B \\
+        \Gamma \vdash p : a \stareq^A_B b
+    }{
+        \Gamma \vdash \refl^\star_a \equiv p : a \stareq^A_B b
+    }
+\end{mathpar}
+
+Suppose we define \subst as our eliminator for the identity type, rather than \jelim.
+%
+\begin{mathpar}
+    \inferrule*[right={$=$}-elim-subst]{
+        \Gamma \vdash A : \Type \\
+        \Gamma \vdash P : A \to \Type \\\\
+        \Gamma \vdash a : A \\
+        \Gamma \vdash b : A \\
+        \Gamma \vdash p : a =_A b \\
+        \Gamma \vdash d : P ~ a
+    }{
+        \Gamma \vdash \subst ~ A ~ P ~ a ~ b ~ p ~ d : P ~ b
+    }
+
+    \inferrule*[right={$=$}-comp-subst]{\dots}{
+        \Gamma \vdash \subst ~ A ~ P ~ a ~ a ~ \refl_a ~ d \equiv d
+    }
+\end{mathpar}
+
+Then we can derive both \jelim and \kelim from \subst with a functional version of \rip.
+%
+\begin{align*}
+    &\rip : (A : \Type) \to (a : A) \to (p : a =_A a) \to \refl_a = p \\
+    &\rip ~ A ~ a ~ p \coloneqq \refl_p \qquad\qquad\qquad\qquad\text{(by the \refrule{\rip} rule)} \\
+    \\
+    &\jelim : (A : \Type) \to (P : (a, b : A) \to (p : a =_A b) \to \Type) \\
+    &\quad \to (d : (a : A) \to P ~ a ~ a ~ \refl_a) \to (a, b : A) \to (p : a =_A b) \to P ~ a ~ b ~ p \\
+    &\jelim ~ A ~ P ~ d ~ a ~ b ~ p \coloneqq \subst ~ A ~ (\lambda b : A. ~ (p : a =_A b) \to P ~ a ~ b ~ p) ~ a ~ b ~ p ~ \text{Paap} ~ p\\
+    &\quad \textit{where}\\
+    &\qquad \text{Paap} : (p : a =_A a) \to (P ~ a ~ a ~ p) \\
+    &\qquad \text{Paap} ~ p \coloneqq \subst ~ (a =_A a) ~ (P ~ a ~ a) ~ \refl_a ~ p ~ (\rip ~ A ~ a ~ a ~ p) ~ (d ~ a) \\
+    \\
+    &\kelim : (A : \Type) \to (a : A) \to (P : (p : a =_A a) \to \Type) \\
+    &\quad \to (d : P ~ \refl_a) \to (p : a =_A a) \to P ~ p \\
+    &\kelim ~ A ~ a ~ P ~ d ~ p \coloneqq \subst ~ (a =_A a) ~ P ~ \refl_a ~ (\rip ~ A ~ a ~ a ~ p) ~ d
+\end{align*}
+
+For \jelim, the idea is that we \subst over $p$ from $P ~ a ~ a ~ p$ to $P ~ a ~ b ~ p$, and to obtain $P ~ a ~ a ~ p$ we \subst over \rip from $P ~ a ~ a ~ \refl_a$. For \kelim, we simply \subst over $\rip$ from $P ~ \refl_a$ to $P ~ p$.
+
+In essence, \subst plays the role of the \jelim eliminator, while \uip (or \rip) is in a sense equivalent to the \kelim eliminator, since one can be derived from the other. If \uip is desired in the type theory, then one may pick any one of the following combinations:
+%
+\begin{itemize}
+    \item The \jelim and \kelim eliminators (\jelim implies \subst and \kelim implies \uip);
+    \item The \jelim eliminator and \uip (\jelim implies \subst and \uip with subst implies \kelim);
+    \item The \subst eliminator and \uip (together imply \jelim and \kelim);
+    \item The \subst and \kelim eliminators (\kelim implies \uip and \subst with \uip implies \jelim); or
+    \item The $\jelim^\star$ eliminator (implies $\uip^\star$ and $\subst^\star$, which together imply $\kelim^\star$)
+\end{itemize}
+
+However, if \uip is not desired, then it is not sufficient to replace \subst by \jelim. We can also do the same for heterogenous equality, but since $\jelim^\star$ can derive all of $\kelim^\star$, $\uip^\star$, and $\subst^\star$, one might as well assert only $\jelim^\star$.
+
+\subsection{Function Extensionality}
+
+Function extensionality states that if two functions of the same type are equal at every point in their domain, then they themselves are equal. This is perhaps the most intuitive conception of what ``extensionality'' means: the values of the functions at each point in the domain are their ``extensions'', and extensionality is the property that two things are identified solely by their extensions.
+%
+\begin{mathpar}
+    \inferrule*[right=funext]{
+        \Gamma \vdash A : \Type \\
+        \Gamma \vdash B : A \to \Type \\
+        \Gamma \vdash f : (a : A) \to B ~ a \\
+        \Gamma \vdash g : (a : A) \to B ~ a \\
+        \Gamma \vdash h : (a : A) \to f ~ a =_{B a} g ~ a
+    }{
+        \Gamma \vdash \funext ~ A ~ B ~ f ~ g ~ h : f = g
+    }
+\end{mathpar}
+
+Unfortunately, there is no computation rule for functional extensionality, which means that any computation will get ``stuck'' on its uses. There are some other concepts that can provide computational meaning to functional extensionality, such as \emph{cubical type theories} (via path types), or \emph{higher inductive types} (via an interval type).
+
+On the other hand, functional extensionality can be derived using equality reflection and the uniqueness rule ($\eta$-expansion) for functions. Specifically, with some mild fudging:
+%
+\begin{mathpar}
+    \inferrule*[Right={$\lambda$}-elim]{
+        \Gamma \vdash A : \Type \\
+        \Gamma \vdash B : A \to \Type \\
+        \Gamma \vdash f : (a : A) \to B ~ a \\
+        \Gamma \vdash g : (a : A) \to B ~ a \\
+        \Gamma \vdash h : (a : A) \to f ~ a =_{B a} g ~ a
+    }{
+    \inferrule*[Right=reflect]{
+        \Gamma, (a:A) \vdash h ~ a : f ~ a =_{B a} g ~ a
+    }{
+    \inferrule*[Right={$\lambda$}-intro]{
+        \Gamma, (a:A) \vdash f ~ a \equiv g ~ a : B ~ a
+    }{
+    \inferrule*[Right={$\lambda$}-uniq]{
+        \Gamma \vdash \lambda a : A. ~ f ~ a \equiv \lambda a : A. ~ g ~ a : B ~ a
+    }{
+    \inferrule*[Right={$=$}-form]{
+        \Gamma \vdash f \equiv g : (a : A) \to B ~ a
+    }{
+        \Gamma \vdash \refl : f = g
+    }}}}}
+\end{mathpar}
+
+\subsection{Setoids and Quotient Types}
+
+\begin{quote}
+    Setoid and 0-groupoid are from category theory. 0-types / isSet types are from HoTT. Bishop sets are a particular way to obtain set quotients constructively in CZF [Constructive Zermelo--Fraenkel set theory]. Quotient types are the type theory analogue of set quotients, a specific case of setoid types / isSet types.
+
+    \hfill\textit{--- @jordyd@octodon.social}
+\end{quote}
+
+Setoids?? 0-groupoids?? Bishop sets?? Quotient types?? I don't understand these??? what
+
+\printbibliography
+
+\begin{appendices}
+\chapter{}
+\section{Functions}
+
+\begin{mathpar}
+    \inferrule*[right={$\lambda$}-form]{
+        \Gamma \vdash A : \Type \\
+        \Gamma, (x : A) \vdash B : \Type
+    }{
+        \Gamma \vdash (x : A) \to B : \Type
+    }
+
+    \inferrule*[right={$\lambda$}-intro]{
+        \Gamma \vdash A : \Type \\
+        \Gamma, (x : A) \vdash b : B
+    }{
+    \Gamma \vdash \lambda x : A. ~ b : (x : A) \to B
+    }
+
+    \inferrule*[right={$\lambda$}-elim]{
+        \Gamma \vdash f : (x : A) \to B \\
+        \Gamma \vdash a : A
+    }{
+        \Gamma \vdash f ~ a : B[x \mapsto a]
+    }
+
+    \inferrule*[right={$\lambda$}-comp]{
+        \Gamma \vdash A : \Type \\
+        \Gamma \vdash a : A \\
+        \Gamma (x : A) \vdash B : \Type \\
+        \Gamma, (x : A) \vdash b : B
+    }{
+        \Gamma \vdash (\lambda x : A. ~ b) ~ a \equiv b[x \mapsto a] : B[x \mapsto a]
+    }
+
+    \inferrule*[right={$\lambda$}-uniq]{
+        \Gamma \vdash A : \Type \\
+        \Gamma (x : A) \vdash B : \Type \\
+        \Gamma \vdash f : (x : A) \to B
+    }{
+        \Gamma \vdash (\lambda y : A. ~ f ~ y) \equiv f : (x : A) \to B
+    }
+\end{mathpar}
+\end{appendices}
+
+\end{document}
