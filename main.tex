@@ -24,6 +24,9 @@
 \newcommand{\List}{\const{List}}
 \newcommand{\nil}{\const{nil}}
 \newcommand{\cons}{\const{cons}}
+\newcommand{\PList}{\const{PList}}
+\newcommand{\pnil}{\const{pnil}}
+\newcommand{\pcons}{\const{pcons}}
 \newcommand{\Tree}{\const{Tree}}
 \newcommand{\Forest}{\const{Forest}}
 \newcommand{\TreeForest}{\const{TreeForest}}
@@ -434,7 +437,7 @@ Although case expressions and fixed point operators have a more function-like pr
 
 \subsection{Eliminators}
 
-The data definitions we have seen are called \emph{inductive} because the elements of the inductive type are built up inductively. That is, starting with no elements at all, we look at our constructors and see what elements we can build at each step. For example, with the naturals, from no elements at all, we see that we can construct one element: $\zero$. Then at the next step, we can construct from that one element $(\succ ~ \zero)$, and so on. If an inductive type has a parameter $A$, then we begin the construction with all the elements of $A$. Considering the usual list type parameterize over some $A$, we first have $\nil$, then one step later, we have $(\cons ~ a ~ \nil)$ for every element $a : A$, and so forth.
+The data definitions we have seen are called \emph{inductive} because the elements of the inductive type are built up inductively. That is, starting with no elements at all, we look at our constructors and see what elements we can build at each step. For example, with the naturals, from no elements at all, we see that we can construct one element: $\zero$. Then at the next step, we can construct from that one element $(\succ ~ \zero)$, and so on. If an inductive type has a parameter $A$, then we begin the construction with all the elements of $A$. Considering the usual list type parametrize over some $A$, we first have $\nil$, then one step later, we have $(\cons ~ a ~ \nil)$ for every element $a : A$, and so forth.
 
 Often we wish to prove properties about the elements in our inductive types. In mathematics, to prove some property $P$, we use \emph{induction}: If we can show that for every possible constructor $c$, $P$ holding for the components of $c$ implies that $P$ holds for $c$ built out of those components, then $P$ must hold for \emph{all} elements of the inductive type. This idea is called the \emph{induction principle}, the \emph{elimination principle}, or simply the \emph{eliminator}, since it is used to eliminate a member of an inductive type into some other type. It's also called the \emph{recursor} as it computes recursively.
 
@@ -449,7 +452,7 @@ For each constructor $c_i$, we need the statement $P_i$ that if $P$ holds for al
 \end{align*}
 
 If $\Delta_{\mathbb{J}}$ is empty, then $P_i$ is a \emph{base case}; otherwise, it is a \emph{step case} \citep{inductive-families}. Finally, we collect together the parameters, the major premise (motive), the minor premises (base and step cases), the indices, and finally the target, and produce a return type of $P$ applied to the indices and the target. We also summarize the various components involved in the eliminator. While we present it as a type, it can also be presented as a typing rule by stating all of the eliminator's arguments as premises and the return type as the type of the fully-applied eliminator.
-
+%
 \begin{align*}
     \const{elim}_I : \Delta_P &\to (P : \Delta_I \to (x : I ~ \Delta_P ~ \Delta_I) \to \Type) \\
     &\to \langle (P_i: \Delta_i \to \Delta_{i\mathbb{J}} \to P ~ \Vec{e}_i ~ (c_i ~ \Delta_i)) \rangle_i \\
@@ -511,8 +514,8 @@ For completeness, we begin with the simplest nontrivial inductive definition: th
 \end{align*}
 %
 \begin{align*}
-    &\const{nrec} : (P : (n: \Nat) \to \Type) \to (pz: P ~ \zero) \\
-    &\qquad\to (ps: (n: \Nat) \to (pn: P ~ n) \to P ~ (\succ ~ n)) \\
+    &\const{nrec} : (P : \Nat \to \Type) \to (pz: P ~ \zero) \\
+    &\qquad\to (ps: (n: \Nat) \to P ~ n \to P ~ (\succ ~ n)) \\
     &\qquad\to (n: \Nat) \to P ~ n \\
     &\const{nrec} ~ P ~ pz ~ ps ~ \zero \coloneqq pz \\
     &\const{nrec} ~ P ~ pz ~ ps ~ (\succ ~ n) \coloneqq ps ~ n ~ (\const{nrec} ~ P ~ pz ~ ps ~ n)
@@ -521,14 +524,14 @@ For completeness, we begin with the simplest nontrivial inductive definition: th
 This is the usual mathematical induction over natural numbers: we prove that some property holds for all naturals by first showing that it holds for zero, then by showing that if it holds for $n$ it will also hold for $n+1$. Now that we have the naturals, we are able to define the \emph{finite sets}, which are indexed by naturals.
 %
 \begin{align*}
-    \data ~ \Fin &: (n : \Nat) \to \Type ~ \where \\
+    \data ~ \Fin &: \Nat \to \Type ~ \where \\
     \fzero &: (n: \Nat) \to \Fin ~ (\succ ~ n) \\
-    \fsucc &: (n: \Nat) \to (f: \Fin ~ n) \to \Fin ~ (\succ ~ n)
+    \fsucc &: (n: \Nat) \to \Fin ~ n \to \Fin ~ (\succ ~ n)
 \end{align*}
 %
 \begin{align*}
-    &\const{frec} : (P : (n: \Nat) \to (f: \Fin ~ n) \to \Type) \to (pfz: (n: \Nat) \to P ~ (\succ ~ n) ~ (\fzero ~ n)) \\
-    &\qquad\to (pfs: (n: \Nat) \to (f: \Fin ~ n) \to (pfn: P ~ n ~ f) \to P ~ (\succ ~ n) ~ (\fsucc ~ n ~ f)) \\
+    &\const{frec} : (P : (n: \Nat) \to \Fin ~ n \to \Type) \to (pfz: (n: \Nat) \to P ~ (\succ ~ n) ~ (\fzero ~ n)) \\
+    &\qquad\to (pfs: (n: \Nat) \to (f: \Fin ~ n) \to P ~ n ~ f \to P ~ (\succ ~ n) ~ (\fsucc ~ n ~ f)) \\
     &\qquad\to (n: \Nat) \to (f: \Fin ~ n) \to P ~ n ~ f \\
     &\const{frec} ~ P ~ pfz ~ pfs ~ (\succ ~ n) ~ (\fzero ~ n) \coloneqq pfz ~ (\succ ~ n) \\
     &\const{frec} ~ P ~ pfz ~ pfs ~ (\succ ~ n) ~ (\fsucc ~ n ~ f) \coloneqq pfs ~ n ~ f ~ (\const{frec} ~ P ~ pfz ~ pfs ~ n ~ f)
@@ -541,11 +544,11 @@ Next, we move on to the simplest nontrivial parametrized inductive definition, t
 \begin{align*}
     \data ~ &\List ~ (A: \Type): \Type ~ \where \\
     &\nil: \List ~ A \\
-    &\cons : (a: A) \to (l: \List ~ A) \to \List ~ A
+    &\cons : A \to \List ~ A \to \List ~ A
 \end{align*}
 \begin{align*}
-    &\const{lrec}: (A: \Type) \to (P: (l: \List ~ A) \to \Type) \to (pn: P ~ \nil) \\
-    &\qquad\to (ps: (a: A) \to (l: \List ~ A) \to (pl: P ~ l) \to P ~ (\cons ~ a ~ l)) \\
+    &\const{lrec}: (A: \Type) \to (P: \List ~ A \to \Type) \to (pn: P ~ \nil) \\
+    &\qquad\to (ps: A \to (l: \List ~ A) \to P ~ l \to P ~ (\cons ~ a ~ l)) \\
     &\qquad\to (l: \List ~ A) \to P ~ l \\
     &\const{lrec} ~ A ~ P ~ pn ~ ps ~ \nil \coloneqq pn \\
     &\const{lrec} ~ A ~ P ~ pn ~ ps ~ (\cons ~ a ~ l) \coloneqq ps ~ a ~ l ~ (\const{lrec} ~ A ~ P ~ pn ~ ps ~ l)
@@ -554,17 +557,50 @@ Next, we move on to the simplest nontrivial parametrized inductive definition, t
 Analogous to lists are \emph{vectors}, which are lists whose lengths are encoded in the type as an index, and one of the simplest nontrivial inductive definitions with both a parameter and an index.
 %
 \begin{align*}
-    \data ~ &\Vector ~ (A: \Type): (n: \Nat) \to \Type ~ \where \\
+    \data ~ &\Vector ~ (A: \Type): \Nat \to \Type ~ \where \\
     &\vnil: \Vector ~ A ~ \zero \\
-    &\vcons: (n: \Nat) \to (a: A) \to (v: \Vector ~ A ~ n) \to \Vector ~ A ~ (\succ n)
+    &\vcons: (n: \Nat) \to A \to \Vector ~ A ~ n \to \Vector ~ A ~ (\succ n)
 \end{align*}
 \begin{align*}
-    &\const{vrec}: (A: \Type) \to (P: (n: \Nat) \to (v: \Vector ~ A ~ n) \to \Type) \to (pvn: P ~ \zero ~ \vnil) \\
-    &\qquad\to (pvc: (n: \Nat) \to (a: A) \to (v: \Vector ~ A ~ n) \to (pv: P ~ n ~ v) \to P ~ (\succ ~ n) ~ (\vcons ~ n ~ a ~ v)) \\
+    &\const{vrec}: (A: \Type) \to (P: (n: \Nat) \to \Vector ~ A ~ n \to \Type) \to (pvn: P ~ \zero ~ \vnil) \\
+    &\qquad\to (pvc: (n: \Nat) \to A \to (v: \Vector ~ A ~ n) \to P ~ n ~ v \to P ~ (\succ ~ n) ~ (\vcons ~ n ~ a ~ v)) \\
     &\qquad\to (n: \Nat) \to (v: \Vector ~ A ~ n) \to P ~ n ~ v \\
     &\const{vrec} ~ A ~ P ~ pvn ~ pvc ~ \zero ~ \vnil \coloneqq pvn \\
     &\const{vrec} ~ A ~ P ~ pvn ~ pvc ~ (\succ ~ n) ~ (\vcons ~ n ~ a ~ v) \coloneqq pvc ~ n ~ a ~ v ~ (\const{vrec} ~ A ~ P ~ pvn ~ pvc ~ n ~ v)
 \end{align*}
+
+Although we don't have a general method for deriving the eliminator for nested inductive definitions, we can still analyze particular instances and derive sensible eliminators for them. Consider for instance the $\Tree$ type. The major premise is straightforwardly $$P: \Tree ~ A \to \Type.$$ As for the minor premise corresponding to the $\tree$ constructor, we begin with $$pt: (a: A) \to (l: \List ~ (\Tree ~ A)) \to \; ? \to P ~ (\tree ~ a ~ l).$$ For the missing inductive hypothesis, we need to capture the idea of $P$ holding for every tree in the list, implemented using pattern matching as recursive calls on the trees. So we create a new data definition that contains these proofs.
+%
+\begin{align*}
+    \data ~ &\PList ~ (A: \Type) (P: A \to \Type): \List ~ A \to \Type ~ \where \\
+    &\pnil: \PList ~ A ~ P ~ \nil \\
+    &\pcons: (a: A) \to (l: \List ~ A) \to P ~ a \to \PList ~ A ~ P ~ l \to \PList ~ A ~ P ~ (\cons ~ a ~ l)
+\end{align*}
+
+The type and the definition of the eliminator for $\PList$ is left as an exercise for the reader. Then we can fill in the missing hole in our minor premise and state the entire eliminator for $\Tree$.
+%
+\begin{align*}
+    &\const{trec}: (A: \Type) \to (P: \Tree ~ A \to \Type) \\
+    &\qquad\to (pt: (a: A) \to (l: \List ~ (\Tree ~ A)) \to \PList ~ (\Tree ~ A) ~ P ~ l \to P ~ (\tree ~ a ~ l)) \\
+    &\qquad\to (t: \Tree ~ A) \to P ~ t \\
+    &\const{trec} ~ A ~ P ~ pt ~ (\tree ~ a ~ ts) \coloneqq pt ~ a ~ ts ~ \; ?
+\end{align*}
+
+As expected, the eliminator reduces by an application of the minor premise. But from where do we get a $\PList$ when we only have a $\List$? Intuitively, a $\PList$ is a list of proofs of $P$ for each element of the list, and $\const{trec}$ gets us proofs of $P$ for a tree, so we need a function that maps over $\List$s to produce $\PList$s. We will use pattern matching to define this function, but we could use the eliminator for lists as well.
+%
+\begin{align*}
+    &\const{pmap}: (A: \Type) \to (P: A \to \Type) \to (f: (a: A) \to P ~ a) \to (l: \List ~ A) \to \PList ~ A ~ P ~ l \\
+    &\const{pmap} ~ A ~ P ~ f ~ \nil \coloneqq \pnil \\
+    &\const{pmap} ~ A ~ P ~ f ~ (\cons ~ a ~ l) \coloneqq \pcons ~ a ~ l ~ (f ~ a) ~ (\const{pmap} ~ A ~ P ~ f ~ l)
+\end{align*}
+
+Finally, we can state the full $\Tree$ eliminator:
+%
+\begin{displaymath}
+    \const{trec} ~ A ~ P ~ pt ~ (\tree ~ a ~ ts) \coloneqq pt ~ a ~ ts ~ (\const{pmap} ~ (\Tree ~ A) ~ P ~ (\const{trec} ~ A ~ P ~ pt) ~ ts)
+\end{displaymath}
+
+\section{W Types}
 
 So far, we have only seen inductive definitions whose constructor arguments are \emph{not} functions. The simplest such inductive definition that doesn't rely on other definitions are the \emph{well-founded trees}, also known as \emph{W types}.
 %
@@ -573,9 +609,7 @@ So far, we have only seen inductive definitions whose constructor arguments are 
     &\const{sup}: (a: A) \to (w: B ~ a \to \W ~ A ~ B) \to \W ~ A ~ B
 \end{align*}
 
-Occasionally the type is written as $\W (x: A). B(x)$, just as function types may be written as $\Pi (x: A). B(x)$. 
-
-\section{W Types}
+Occasionally the type is written as $\W (x: A). B(x)$, just as function types may be written as $\Pi (x: A). B(x)$. Intuitively, when interpreted as a tree, the elements of $A$ % TODO: ????
 
 \section{$\mu$ Types}
 
