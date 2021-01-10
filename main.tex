@@ -2,7 +2,7 @@
 \usepackage[utf8]{inputenc}
 \usepackage[margin=1.25in]{geometry}
 \usepackage[pdf]{graphviz}
-\usepackage[natbib=true]{biblatex}
+\usepackage[natbib=true,maxbibnames=99]{biblatex}
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{mathtools} % for \coloneqq
@@ -96,8 +96,8 @@ The problem is that these rules are part of the type theory, and the programmer 
 
 \begin{enumerate}
     \item \textbf{Inductive data definitions}, where formation and introduction forms defined individually are subject to strict conditions to ensure consistency, and there is a common elimination form;
-    \item \textbf{W-types}, where there is a single set of rules for modelling \emph{well-founded trees}, but have various limitations, such as the dependence on function extensionality; and
-    \item \textbf{Recursive} or \textbf{$\mu$-types}, which are somewhere in between these two, being a single set of rules like W-types, but also require some strict conditions.
+    \item \textbf{W types}, where there is a single set of rules for modelling \emph{well-founded trees}, but have various limitations, such as the dependence on function extensionality; and
+    \item \textbf{Recursive} or \textbf{$\mu$-types}, which are somewhere in between these two, being a single set of rules like W types, but also require some strict conditions.
 \end{enumerate}
 
 All of these have corresponding dual concepts for (usually) infinite data structures: coinductive data definitions, M-types, and corecursive or $\nu$-types.
@@ -503,7 +503,9 @@ For convenience, the typing premise for $\Vec{a}$ is stated twice for recursive 
 
 If $I$ \emph{is} a nested inductive type, then all hope is lost: there is no known general way to state the induction principle for a nested inductive definition. For particularly complex ones, these take some creativity to formulate, and are generally proven from the other methods of recursion.
 
-\subsection{Examples of Inductive Definitions and their Eliminators}
+\subsection{Examples}
+
+\subsubsection{Naturals and Finite Sets}
 
 For completeness, we begin with the simplest nontrivial inductive definition: the Peano naturals. We give the eliminators slightly different names from $\const{elim}_I$.
 %
@@ -539,6 +541,8 @@ This is the usual mathematical induction over natural numbers: we prove that som
 
 The type $\Fin ~ n$ represents the set of numbers no greater than $n$; the type has $n$ inhabitants. For instance, there are no possible elements of type $\Fin ~ \zero$; $\fzero ~ \zero$ is the only element of type $\Fin ~ (\succ ~ \zero)$; $\fzero ~ (\succ ~ \zero)$ and $\fsucc ~ (\succ ~ \zero) ~ (\fzero ~ \zero)$ are the only elements of type $\Fin ~ (\succ ~ (\succ ~ \zero))$; and so on.
 
+\subsubsection{Lists and Vectors}
+
 Next, we move on to the simplest nontrivial parametrized inductive definition, the list, which has already appeared in our definition of trees.
 %
 \begin{align*}
@@ -559,7 +563,7 @@ Analogous to lists are \emph{vectors}, which are lists whose lengths are encoded
 \begin{align*}
     \data ~ &\Vector ~ (A: \Type): \Nat \to \Type ~ \where \\
     &\vnil: \Vector ~ A ~ \zero \\
-    &\vcons: (n: \Nat) \to A \to \Vector ~ A ~ n \to \Vector ~ A ~ (\succ n)
+    &\vcons: (n: \Nat) \to A \to \Vector ~ A ~ n \to \Vector ~ A ~ (\succ ~ n)
 \end{align*}
 \begin{align*}
     &\const{vrec}: (A: \Type) \to (P: (n: \Nat) \to \Vector ~ A ~ n \to \Type) \to (pvn: P ~ \zero ~ \vnil) \\
@@ -568,6 +572,8 @@ Analogous to lists are \emph{vectors}, which are lists whose lengths are encoded
     &\const{vrec} ~ A ~ P ~ pvn ~ pvc ~ \zero ~ \vnil \coloneqq pvn \\
     &\const{vrec} ~ A ~ P ~ pvn ~ pvc ~ (\succ ~ n) ~ (\vcons ~ n ~ a ~ v) \coloneqq pvc ~ n ~ a ~ v ~ (\const{vrec} ~ A ~ P ~ pvn ~ pvc ~ n ~ v)
 \end{align*}
+
+\subsubsection{An Eliminator for Trees}
 
 Although we don't have a general method for deriving the eliminator for nested inductive definitions, we can still analyze particular instances and derive sensible eliminators for them. Consider for instance the $\Tree$ type. The major premise is straightforwardly $$P: \Tree ~ A \to \Type.$$ As for the minor premise corresponding to the $\tree$ constructor, we begin with $$pt: (a: A) \to (l: \List ~ (\Tree ~ A)) \to \; ? \to P ~ (\tree ~ a ~ l).$$ For the missing inductive hypothesis, we need to capture the idea of $P$ holding for every tree in the list, implemented using pattern matching as recursive calls on the trees. So we create a new data definition that contains these proofs.
 %
@@ -599,6 +605,27 @@ Finally, we can state the full $\Tree$ eliminator:
 \begin{displaymath}
     \const{trec} ~ A ~ P ~ pt ~ (\tree ~ a ~ ts) \coloneqq pt ~ a ~ ts ~ (\const{pmap} ~ (\Tree ~ A) ~ P ~ (\const{trec} ~ A ~ P ~ pt) ~ ts)
 \end{displaymath}
+
+\subsubsection{Equality and Indices}
+
+Although it isn't inductive and its eliminator requires no recursion, the \emph{equality type} is an important data definition. It asserts the equality of two terms by providing only a single constructor stating reflexivity of equality: something can only be equal to itself. The definition comes in two variants, the latter due to Paulin--Mohring \citep{jk-hott}.
+%
+\begin{align*}
+    \data ~ &(=) ~ (A: \Type): A \to A \to \Type ~ \where \\
+    &\refl: (a: A) \to a =_A a \\
+    \data ~ &(=) ~ (A: \Type) (a: A): A \to \Type ~ \where \\
+    &\refl: a =_A a
+\end{align*}
+
+We use the infix notation $a =_A a$ to mean $(=) ~ A ~ a ~ a$ and occasionally omit the type $A$ when it is clear from context. We also delay discussion of the eliminators to a later chapter. The first definition illustrates how we can always turn parameters (as in $(a: A)$ in the second definition) into indices. However, with an equality type, we can now turn any \emph{indices} into \emph{parameters} by asserting equality of the parameters they've become with a constructor argument representing the former index.\footnote{This technique is reportedly \citep{frex} called \emph{fording} by \citet{mcbride-phd}.} To illustrate, we can define the finite sets as follows:
+%
+\begin{align*}
+    \data ~ &\Fin ~ (n: \Nat): \Type ~ \where \\
+    &\fzero: (m: \Nat) \to (n = \succ ~ m) \to \Fin ~ n \\
+    &\fsucc: (m: \Nat) \to (n = \succ ~ m) \to \Fin ~ m \to \Fin ~ n
+\end{align*}
+
+Then what was formerly $\fzero ~ \zero: \Fin ~ (\succ ~ \zero)$ now becomes $\fzero ~ \zero ~ (\refl ~ (\succ \zero)): \Fin ~ (\succ ~ \zero)$, trivially requiring an extra proof of equality. In short, we can turn all indices into parameters so long as we have the indexed equality type as our one single inductive definition with indices.
 
 \section{W Types}
 
