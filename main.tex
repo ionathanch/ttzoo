@@ -583,7 +583,7 @@ The type and the definition of the eliminator for $\PList$ is left as an exercis
     &\const{trec}: (A: \Type) \to (P: \Tree ~ A \to \Type) \\
     &\qquad\to (pt: (a: A) \to (l: \List ~ (\Tree ~ A)) \to \PList ~ (\Tree ~ A) ~ P ~ l \to P ~ (\tree ~ a ~ l)) \\
     &\qquad\to (t: \Tree ~ A) \to P ~ t \\
-    &\const{trec} ~ A ~ P ~ pt ~ (\tree ~ a ~ ts) \coloneqq pt ~ a ~ ts ~ \; ?
+    &\const{trec} ~ A ~ P ~ pt ~ (\tree ~ a ~ ts) \coloneqq pt ~ a ~ ts ~ ?
 \end{align*}
 
 As expected, the eliminator reduces by an application of the minor premise. But from where do we get a $\PList$ when we only have a $\List$? Intuitively, a $\PList$ is a list of proofs of $P$ for each element of the list, and $\const{trec}$ gets us proofs of $P$ for a tree, so we need a function that maps over $\List$s to produce $\PList$s. We will use pattern matching to define this function, but we could use the eliminator for lists as well.
@@ -609,7 +609,7 @@ So far, we have only seen inductive definitions whose constructor arguments are 
     &\const{sup}: (a: A) \to (w: B ~ a \to \W ~ A ~ B) \to \W ~ A ~ B
 \end{align*}
 
-Occasionally the type is written as $\W (x: A). B(x)$, just as function types may be written as $\Pi (x: A). B(x)$. Intuitively, when interpreted as a tree, the elements of $A$ % TODO: ????
+Occasionally the type is written as $\W (x: A). B(x)$, just as function types may be written as $\Pi (x: A). B(x)$. Intuitively, when interpreted as a tree, there is a branch for each element $a: A$, and $B ~ a$ gives the types of the data that is stored in that branch.
 
 \section{$\mu$ Types}
 
