@@ -22,6 +22,7 @@ A collection of notes on various features commonly found in type theories whose 
 * Univalence, n-types (without going too much into HoTT)
 
 ## TODOs
+* Add typing rules for dependent pairs and booleans in the appendix
 * Remove introducing dependent eliminators from _Notions of Equality_
 * "Judgemental equality" is **not** extensional equality, and no-one uses "computational equality"
 * Fix DOT graph generation

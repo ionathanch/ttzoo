@@ -31,6 +31,9 @@
 \newcommand{\Forest}{\const{Forest}}
 \newcommand{\TreeForest}{\const{TreeForest}}
 \newcommand{\tree}{\const{tree}}
+\newcommand{\BTree}{\const{BTree}}
+\newcommand{\leaf}{\const{leaf}}
+\newcommand{\node}{\const{node}}
 \newcommand{\Fin}{\const{Fin}}
 \newcommand{\fzero}{\const{fzero}}
 \newcommand{\fsucc}{\const{fsucc}}
@@ -361,7 +364,7 @@ Taking it one step further, if we can make the case expression \emph{nondependen
     }
 \end{mathpar}
 
-Notice that $P$ and $d_i$ are all terms of function type, but do not have to syntactically be functions: they can also be terms that \emph{reduce} to functions. We can prevent the appearance of arbitrary function-typed terms by explicitly binding variables in an alternate match expression.
+Notice that $P$ and $d_i$ are all terms of function type, but do not have to syntactically be functions: they can also be terms that \emph{reduce} to functions. We can prevent the appearance of arbitrary function-typed terms by explicitly binding variables in an alternate match expression. Again, if the motive is nondependent, then it can be inferred.
 %
 \begin{mathpar}
     \inferrule*[Right=match]{
@@ -636,10 +639,102 @@ So far, we have only seen inductive definitions whose constructor arguments are 
     &\const{sup}: (a: A) \to (w: B ~ a \to \W ~ A ~ B) \to \W ~ A ~ B
 \end{align*}
 
-Occasionally the type is written as $\W (x: A). B(x)$, just as function types may be written as $\Pi (x: A). B(x)$. Intuitively, when interpreted as a tree, there is a branch for each element $a: A$, and $B ~ a$ gives the types of the data that is stored in that branch.
+Occasionally the type is written as $\W (x: A). B(x)$, just as function types may be written as $\Pi (x: A). B(x)$. Intuitively, when interpreted as a tree, there is a branch for each element $a: A$, and a subtree for each element in $B ~ a$. As such, the constructor $\sup ~ a ~ b$ is also written infixively as $a \lhd b$ to evoke ``a picture of a tree growing rightward from a root'' \citep{mcbride-wtype}.
+
+W types can in fact also be interpreted as an encoding for inductive definitions themselves, where the branches are constructors and the subtrees are the recursive arguments. Taking $\bot = (A: \Type) \to A$% TODO: Maybe this belongs in the Examples section?
+\footnote{An alternate definition would be the data definition $$\data ~ \bot: \Type ~ \where$$ with no constructors, and whose eliminator is then $$\const{elim}_\bot : (P: \bot \to \Type) \to (b: \bot) \to P ~ b.$$}, $\top = (A: \Type) \to A \to A$, and assuming the existence of the usual $\Bool$, we can define structures such as the naturals and binary trees.
+
+\begin{align*}
+    \Nat &\coloneqq \W ~ \Bool ~ (\lambda b: \Bool. ~ \case ~ b ~ \of ~ \langle \false \Rightarrow \bot, \true \Rightarrow \top \rangle) \\
+    \zero &\coloneqq \sup ~ \false ~ (\lambda x: \bot. ~ x ~ \Nat) \\
+    \succ ~ n &\coloneqq \sup ~ \true ~ (\lambda x: \top. ~ n)
+\end{align*}
+\begin{align*}
+    \BTree &\coloneqq \W ~ \Bool ~ (\lambda b: \Bool. ~ \case ~ b ~ \of ~ \langle \false \Rightarrow \bot, \true \Rightarrow \Bool \rangle) \\
+    \leaf &\coloneqq \sup ~ \false ~ (\lambda x: \bot. ~ x ~ \BTree) \\
+    \node ~ l ~ r &\coloneqq \sup ~ \true ~ (\lambda b: \Bool. ~ \case ~ b ~ \of ~ \langle \false \Rightarrow l, \true \Rightarrow r \rangle)
+\end{align*}
+
+Because the second argument always needs to produce a W type, the base cases ask for a $\bot$ so that the required W type can be produced at will. In the step cases, we return the recursive arguments depending on the input. To define structures that also non-recursive arguments, we also need to assume the existence of pairs, whose types are written as $(x: A * B)$ in the dependent case
+and $(A * B)$ in the nondependent case.% TODO: Maybe this belongs in the Examples section?
+\footnote{The corresponding inductive type for the dependent case would be
+\begin{align*}
+    \data ~ &\const{Pair} ~ (A: \Type) ~ (B: A \to \Type): \Type ~ \where \\
+    &\const{pair}: (x: A) \to B ~ x \to \const{Pair} ~ A ~ B
+\end{align*}
+and similarly for the nondependent case. As an independent typing rule, the type is usually written as $\Sigma(x:A).B(x)$.}
+Then we can define labelled binary trees as follows, sticking the label in the first argument.
+%
+\begin{align*}
+    \BTree ~ A &\coloneqq \W ~ (\Bool * A) ~ (\lambda (b, a): (\Bool * A). ~ \case ~ b ~ \of ~ \langle \false \Rightarrow \bot, \true \Rightarrow \Bool \rangle) \\
+    \leaf &\coloneqq \sup ~ (\false, a) ~ (\lambda x: \bot. ~ x ~ \BTree) \\
+    \node ~ l ~ r &\coloneqq \sup ~ (\true, a) ~ (\lambda b: \Bool. ~ \case ~ b ~ \of ~ \langle \false \Rightarrow l, \true \Rightarrow r \rangle)
+\end{align*}
+
+To define lists (which are essentially labelled naturals) that may possibly be empty, we need the option to supply no label to the base case, which is done using a dependent pair. We use $\_$ to omit unneeded arguments for concision.
+%
+\begin{alignat*}{3}
+    \List ~ A &\coloneqq \W ~ &&(b: \Bool * \case ~ b ~ \of ~ \langle \false \Rightarrow \top, \true \Rightarrow A \rangle) \\
+    &&&(\lambda (b, \_): (\Bool * \_). ~ \case ~ b ~ \of ~ \langle \false \Rightarrow \bot, \true \Rightarrow \top \rangle) \\
+    \nil &\coloneqq \sup ~ &&(\false, \lambda A: \Type. ~ \lambda a: A. ~ a) ~ (\lambda x: \bot. ~ x ~ \List) \\
+    \cons ~ a ~ l &\coloneqq \sup ~ &&(\true, a) ~ (\lambda x: \top. ~ l)
+\end{alignat*}
+
+The first immediate downside to using W types as compared to inductive definitions is that we require at the very least an existing type with two distinguishable elements (in our case, $\Bool$) and a (dependent) pair type, whereas with inductive definitions these can be \emph{defined as} inductive types.
+
+\subsection{Typing Rules}
+
+Now that we've sufficiently convinced ourselves that W types are a possible alternative to inductive definitions, we formally state their typing rules, omitting repeated premises in the computation rule. Notice that the computation rule requires no information gained solely from the typing premises, so we could also write it as a reduction rule.
+
+\begin{mathpar}
+    \inferrule*[right=form-W]{
+        \Gamma \vdash A: \Type
+        \and
+        \Gamma \vdash B: A \to \Type
+    }{
+        \Gamma \vdash \W ~ A ~ B: \Type
+    }
+    
+    \inferrule*[right=intro-W]{
+        \Gamma \vdash a: A
+        \and
+        \Gamma (a: A) \vdash b: B ~ a \to \W ~ A ~ B
+    }{
+        \Gamma \vdash \sup ~ a ~ b: \W ~ A ~ B
+    }
+    
+    \inferrule*[right=elim-W]{
+        \Gamma \vdash A: \Type
+        \and
+        \Gamma \vdash B: A \to \Type
+        \and
+        \Gamma \vdash P: \W ~ A ~ B \to \Type
+        \and
+        \Gamma \vdash w: \W ~ A ~ B
+        \\\\
+        \Gamma \vdash p: (a: A) \to (b: B ~ a \to W ~ A ~ B) \to (pw: (x: B ~ a) \to P ~ (b ~ x)) \to P ~ (\sup ~ a ~ b)
+    }{
+        \Gamma \vdash \const{wrec} ~ A ~ B ~ P ~ p ~ w: P ~ w
+    }
+    
+    \inferrule*[right=comp-W]{
+        \dots
+        \and
+        \Gamma \vdash a: A
+        \and
+        \Gamma \vdash b: B ~ a
+    }{
+        \Gamma \vdash \const{wrec} ~ A ~ B ~ P ~ p ~ (\sup ~ a ~ b) \equiv p ~ a ~ b ~ (\lambda x: B ~ a. ~ \const{wrec} ~ A ~ B ~ P ~ p ~ (b ~ x)) : P ~ (\sup ~ a ~ b)
+    }
+\end{mathpar}
+
+\subsection{Recovering Induction Principles}
+
+\subsection{W Types with Explicit Base Cases}
 
 \section{$\mu$ Types}
 
+\newpage
 \section{A Note on Notation}
 
 Throughout this section, a variety of different letters are used to mean different things in different contexts. We play fast and loose with the notational conventions because we aren't discussing \emph{one} type theory but rather the many different features a type theory might have and how they might appear. Even so, we catalogue here the primary uses of the letters and give a brief rundown of what should be fairly self-evident syntax.
@@ -656,11 +751,6 @@ Throughout this section, a variety of different letters are used to mean differe
     \item $\mathbb{I}, \mathbb{J}$ are sets of naturals.
     \item $=$ is used as both an equality in the metalanguage, usually for some sort of alpha-equivalent syntactic equality, and as the propositional equality type. $\coloneqq$ is a definitional equality, binding some constant to a term, possibly with pattern-matching. Finally, $\equiv$ is judgemental equality, determined by judgement rules.
 \end{itemize}
-
-% TODO:
-% * eliminators
-% * W types using inductive types
-% * mu types???
 
 \chapter{Notions of Equality}
 \section{An Identity Crisis}
