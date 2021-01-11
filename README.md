@@ -6,7 +6,7 @@ A collection of notes on various features commonly found in type theories whose 
 * Basic type theory (there are so many people who have already done this)
   * First-order predicate logic in judgement form
   * Types are propositions, terms are proofs, computation is proof simplification
-  * Syntax and judgement forms
+  * Syntax and judgement forms, positive vs. negative presentations
   * The MLTT model (formation/introduction/elimination/computation/uniqueness rules)
   * The PTS model (rules and axioms)
 * Type universes (want!!)

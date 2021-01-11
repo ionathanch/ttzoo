@@ -662,7 +662,7 @@ and $(A * B)$ in the nondependent case.% TODO: Maybe this belongs in the Example
     \data ~ &\const{Pair} ~ (A: \Type) ~ (B: A \to \Type): \Type ~ \where \\
     &\const{pair}: (x: A) \to B ~ x \to \const{Pair} ~ A ~ B
 \end{align*}
-and similarly for the nondependent case. As an independent typing rule, the type is usually written as $\Sigma(x:A).B(x)$.}
+and similarly for the nondependent case. As an independent typing rule, the type is usually written as $\Sigma(x:A).B(x)$. Instead of using case expressions, eliminators, or projection functions for pairs, we use a \emph{pattern-matching lambda} of the form $\lambda(a, b): (A * B). ~ e$.}
 Then we can define labelled binary trees as follows, sticking the label in the first argument.
 %
 \begin{align*}
@@ -684,7 +684,7 @@ The first immediate downside to using W types as compared to inductive definitio
 
 \subsection{Typing Rules}
 
-Now that we've sufficiently convinced ourselves that W types are a possible alternative to inductive definitions, we formally state their typing rules, omitting repeated premises in the computation rule. Notice that the computation rule requires no information gained solely from the typing premises, so we could also write it as a reduction rule.
+Now that we've sufficiently convinced ourselves that W types are a possible alternative to inductive definitions, we formally state their typing rules, omitting repeated premises in the computation rule. Since the constructor is stated separately from the type, we need to explicitly provide the parameters. Notice that the computation rule requires no information gained solely from the typing premises, so we could also write it as a reduction rule.
 
 \begin{mathpar}
     \inferrule*[right=form-W]{
@@ -700,7 +700,7 @@ Now that we've sufficiently convinced ourselves that W types are a possible alte
         \and
         \Gamma (a: A) \vdash b: B ~ a \to \W ~ A ~ B
     }{
-        \Gamma \vdash \sup ~ a ~ b: \W ~ A ~ B
+        \Gamma \vdash \sup ~ A ~ B ~ a ~ b: \W ~ A ~ B
     }
     
     \inferrule*[right=elim-W]{
@@ -712,7 +712,7 @@ Now that we've sufficiently convinced ourselves that W types are a possible alte
         \and
         \Gamma \vdash w: \W ~ A ~ B
         \\\\
-        \Gamma \vdash p: (a: A) \to (b: B ~ a \to W ~ A ~ B) \to (pw: (x: B ~ a) \to P ~ (b ~ x)) \to P ~ (\sup ~ a ~ b)
+        \Gamma \vdash p: (a: A) \to (b: B ~ a \to W ~ A ~ B) \to (pw: (x: B ~ a) \to P ~ (b ~ x)) \to P ~ (\sup ~ A ~ B ~ a ~ b)
     }{
         \Gamma \vdash \const{wrec} ~ A ~ B ~ P ~ p ~ w: P ~ w
     }
@@ -724,7 +724,7 @@ Now that we've sufficiently convinced ourselves that W types are a possible alte
         \and
         \Gamma \vdash b: B ~ a
     }{
-        \Gamma \vdash \const{wrec} ~ A ~ B ~ P ~ p ~ (\sup ~ a ~ b) \equiv p ~ a ~ b ~ (\lambda x: B ~ a. ~ \const{wrec} ~ A ~ B ~ P ~ p ~ (b ~ x)) : P ~ (\sup ~ a ~ b)
+        \Gamma \vdash \const{wrec} ~ A ~ B ~ P ~ p ~ (\sup ~ A ~ B ~ a ~ b) \equiv p ~ a ~ b ~ (\lambda x: B ~ a. ~ \const{wrec} ~ A ~ B ~ P ~ p ~ (b ~ x)) : P ~ (\sup ~ A ~ B ~ a ~ b)
     }
 \end{mathpar}
 
