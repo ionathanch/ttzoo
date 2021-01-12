@@ -6,8 +6,9 @@
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{mathtools} % for \coloneqq
-\usepackage{fdsymbol} % for \stareq
-\usepackage{xspace} % for \xspace
+\usepackage{fdsymbol}  % for \stareq
+\usepackage{xspace}    % for \xspace
+\usepackage{xcolor}    % for \colorbox
 \usepackage{mathpartir}
 \usepackage{epigraph}
 \usepackage[toc]{appendix}
@@ -46,6 +47,7 @@
 \newcommand{\W}{\const{W}}
 \renewcommand{\sup}{\const{sup}}
 
+\newcommand{\hole}{\colorbox{gray!30}{?}}
 \newcommand{\const}[1]{\text{#1}}
 \newcommand{\data}{\const{data}}
 \newcommand{\Type}{\const{Type}}
@@ -385,6 +387,13 @@ This results in function application in the computation rule for case expression
     \match ~ x.\Vec{y}.P ~ (c_j ~ \Vec{a}) ~ \with ~ \langle c_i ~ \Vec{z} \Rightarrow d_i \rangle_i &\rhd_\iota d_i[\Vec{z} \mapsto \Vec{a}]
 \end{align*}
 
+Finally, we can give a kind of uniqueness rule for functions involving case or match expressions; as untyped reduction rules, we'll call it \emph{$\eta$-contraction}.
+%
+\begin{align*}
+    \case ~ P ~ t ~ \of ~ \langle c_i \Rightarrow \lambda \Delta_i. ~ f ~ (c_i ~ \Delta_i) \rangle_i &\rhd_\eta f ~ t \\
+    \match ~ x.\vec{y}.P ~ t ~ \with ~ \langle c_i ~ \vec{z} \Rightarrow f ~ (c_i ~ \vec{z}) \rangle_i &\rhd_\eta f ~ t
+\end{align*}
+
 \subsection{Fixed Points}
 
 Case and match expressions are generally accompanied by a way to define recursive functions. When the function takes multiple arguments, one of them is deemed the \emph{decreasing argument}, and na\"ive termination checking would merely ensure that recursive calls occur only on components of the decreasing argument. For simplicity, we deal with functions that explicitly state the decreasing argument, starting with the \emph{fixpoint}, which binds the function to a constant.
@@ -446,7 +455,7 @@ Often we wish to prove properties about the elements in our inductive types. In 
 
 In terms of types, $P$ is exactly the motive that we have seen in case and match expressions. For some inductive type $I$, beginning with parameters $\Delta_P$, we have $$P : \Delta_I \to (x : I ~ \Delta_P ~ \Delta_I) \to \Type.$$ This is also known as the \emph{major premise} of the eliminator \citep{inductive-families}. Now consider some constructor $$c_i : \Delta_{i} \to I ~ \Delta_P ~ \Vec{e}_i.$$ where $\Delta_i = \langle (x_{ij} : \Delta_{ij} \to D_{ij}) \rangle_j$ are the constructor's arguments. For the moment, suppose that $I$ is not a nested inductive type. This means that if $D_{ij} = I_{ij} ~ \Vec{p} ~ \Vec{e}_{ij}$, then $I$ does not appear in $\Vec{p}$.
 
-For each constructor $c_i$, we need the statement $P_i$ that if $P$ holds for all of its inductive arguments -- the \emph{induction hypotheses} -- then $P$ holds for the fully-applied $c_i$. These are the \emph{minor premises} of the eliminator \citep{inductive-families}. We will build the type step-by-step. First, we need to provide all of the arguments, and apply $P$ to the fully-applied constructor, as well as the indices of its type. $$P_i: \Delta_i \to \; ? \to P ~ \Vec{e}_i ~ (c_i ~ \Delta_i)$$ Now consider each argument $x_{ij}$ of $c_i$ and its type. If $D_{ij}$ is not an inductive type or it is and $I_{ij} \neq I$, then $x_{ij}$ is not a recursive argument, and $?$ is empty. Otherwise, if $I_{ij} = I$, then we need an inductive hypothesis $P_{ij}$. This takes all of the arguments in $\Delta_{ij}$, and has return type $P$ applied to a term of type $I ~ \Vec{p} ~ \Vec{e}_{ij}$. Luckily, $x_{ij}$ gives us exactly the term we need. $$P_{ij}: \Delta_{ij} \to P ~ \Vec{e}_{ij} ~ (x_{ij} ~ \Delta_{ij})$$ Then all we need to do is provide the minor premise with the inductive hypotheses $\Delta_{\mathbb{J}}$.
+For each constructor $c_i$, we need the statement $P_i$ that if $P$ holds for all of its inductive arguments -- the \emph{induction hypotheses} -- then $P$ holds for the fully-applied $c_i$. These are the \emph{minor premises} of the eliminator \citep{inductive-families}. We will build the type step-by-step. First, we need to provide all of the arguments, and apply $P$ to the fully-applied constructor, as well as the indices of its type. $$P_i: \Delta_i \to \; \hole \to P ~ \Vec{e}_i ~ (c_i ~ \Delta_i)$$ Now consider each argument $x_{ij}$ of $c_i$ and its type. If $D_{ij}$ is not an inductive type or it is and $I_{ij} \neq I$, then $x_{ij}$ is not a recursive argument, and $?$ is empty. Otherwise, if $I_{ij} = I$, then we need an inductive hypothesis $P_{ij}$. This takes all of the arguments in $\Delta_{ij}$, and has return type $P$ applied to a term of type $I ~ \Vec{p} ~ \Vec{e}_{ij}$. Luckily, $x_{ij}$ gives us exactly the term we need. $$P_{ij}: \Delta_{ij} \to P ~ \Vec{e}_{ij} ~ (x_{ij} ~ \Delta_{ij})$$ Then all we need to do is provide the minor premise with the inductive hypotheses $\Delta_{\mathbb{J}}$.
 %
 \begin{align*}
     \mathbb{J} &= \{j \mid I_{ij} = I\} \\
@@ -578,7 +587,7 @@ Analogous to lists are \emph{vectors}, which are lists whose lengths are encoded
 
 \subsubsection{An Eliminator for Trees}
 
-Although we don't have a general method for deriving the eliminator for nested inductive definitions, we can still analyze particular instances and derive sensible eliminators for them. Consider for instance the $\Tree$ type. The major premise is straightforwardly $$P: \Tree ~ A \to \Type.$$ As for the minor premise corresponding to the $\tree$ constructor, we begin with $$pt: (a: A) \to (l: \List ~ (\Tree ~ A)) \to \; ? \to P ~ (\tree ~ a ~ l).$$ For the missing inductive hypothesis, we need to capture the idea of $P$ holding for every tree in the list, implemented using pattern matching as recursive calls on the trees. So we create a new data definition that contains these proofs.
+Although we don't have a general method for deriving the eliminator for nested inductive definitions, we can still analyze particular instances and derive sensible eliminators for them. Consider for instance the $\Tree$ type. The major premise is straightforwardly $$P: \Tree ~ A \to \Type.$$ As for the minor premise corresponding to the $\tree$ constructor, we begin with $$pt: (a: A) \to (l: \List ~ (\Tree ~ A)) \to \; \hole \to P ~ (\tree ~ a ~ l).$$ For the missing inductive hypothesis, we need to capture the idea of $P$ holding for every tree in the list, implemented using pattern matching as recursive calls on the trees. So we create a new data definition that contains these proofs.
 %
 \begin{align*}
     \data ~ &\PList ~ (A: \Type) (P: A \to \Type): \List ~ A \to \Type ~ \where \\
@@ -641,13 +650,24 @@ So far, we have only seen inductive definitions whose constructor arguments are 
 
 Occasionally the type is written as $\W (x: A). B(x)$, just as function types may be written as $\Pi (x: A). B(x)$. Intuitively, when interpreted as a tree, there is a branch for each element $a: A$, and a subtree for each element in $B ~ a$. As such, the constructor $\sup ~ a ~ b$ is also written infixively as $a \lhd b$ to evoke ``a picture of a tree growing rightward from a root'' \citep{mcbride-wtype}.
 
-W types can in fact also be interpreted as an encoding for inductive definitions themselves, where the branches are constructors and the subtrees are the recursive arguments. Taking $\bot = (A: \Type) \to A$% TODO: Maybe this belongs in the Examples section?
-\footnote{An alternate definition would be the data definition $$\data ~ \bot: \Type ~ \where$$ with no constructors, and whose eliminator is then $$\const{elim}_\bot : (P: \bot \to \Type) \to (b: \bot) \to P ~ b.$$}, $\top = (A: \Type) \to A \to A$, and assuming the existence of the usual $\Bool$, we can define structures such as the naturals and binary trees.
+W types can in fact also be interpreted as an encoding for inductive definitions themselves, where the branches are constructors and the subtrees are the recursive arguments. To do so, we need a few base types on top of which we build: a type $\bot$ with no inhabitants, a type $\top$ with (at least) one inhabitant, and a boolean type.\footnote{We previously assumed the existence of $\bot$, interpreting it as the type representing propositional falsehood; we now formalize it as the type asserting that every type has an inhabitant. We can also define $\top$ and $\Bool$ using explicit formation, introduction, elimination, and uniqueness rules, but they would look exactly as expected anyway, and this way we can use case expressions, which are somewhat prettier than eliminators.}
+%
+\begin{align*}
+    \bot &: \Type \\
+    \bot &\coloneqq (A: \Type) \to A \\
+    \data ~ \top &: \Type ~ \where \\
+    \star &: \top \\
+    \data ~ \Bool &: \Type ~ \where \\
+    \false &: \Bool \\
+    \true &: \Bool
+\end{align*}
 
+Now we are able to define some basic structures such as the naturals and binary trees.
+%
 \begin{align*}
     \Nat &\coloneqq \W ~ \Bool ~ (\lambda b: \Bool. ~ \case ~ b ~ \of ~ \langle \false \Rightarrow \bot, \true \Rightarrow \top \rangle) \\
     \zero &\coloneqq \sup ~ \false ~ (\lambda x: \bot. ~ x ~ \Nat) \\
-    \succ ~ n &\coloneqq \sup ~ \true ~ (\lambda x: \top. ~ n)
+    \succ ~ n &\coloneqq \sup ~ \true ~ (\lambda x: \top. ~ \case ~ x ~ \of ~ \langle \star \Rightarrow n \rangle)
 \end{align*}
 \begin{align*}
     \BTree &\coloneqq \W ~ \Bool ~ (\lambda b: \Bool. ~ \case ~ b ~ \of ~ \langle \false \Rightarrow \bot, \true \Rightarrow \Bool \rangle) \\
@@ -655,18 +675,18 @@ W types can in fact also be interpreted as an encoding for inductive definitions
     \node ~ l ~ r &\coloneqq \sup ~ \true ~ (\lambda b: \Bool. ~ \case ~ b ~ \of ~ \langle \false \Rightarrow l, \true \Rightarrow r \rangle)
 \end{align*}
 
-Because the second argument always needs to produce a W type, the base cases ask for a $\bot$ so that the required W type can be produced at will. In the step cases, we return the recursive arguments depending on the input. To define structures that also non-recursive arguments, we also need to assume the existence of pairs, whose types are written as $(x: A * B)$ in the dependent case
-and $(A * B)$ in the nondependent case.% TODO: Maybe this belongs in the Examples section?
+Because the second argument always needs to produce a W type, the base cases ask for a $\bot$ so that the required W type can be produced at will. In the step cases, we return the recursive arguments depending on the input. To define structures that also non-recursive arguments, we also need to assume the existence of pairs, whose types are written as $(x: A \times B)$ in the dependent case
+and $(A \times B)$ in the nondependent case.% TODO: Maybe this belongs in the Examples section?
 \footnote{The corresponding inductive type for the dependent case would be
 \begin{align*}
     \data ~ &\const{Pair} ~ (A: \Type) ~ (B: A \to \Type): \Type ~ \where \\
     &\const{pair}: (x: A) \to B ~ x \to \const{Pair} ~ A ~ B
 \end{align*}
-and similarly for the nondependent case. As an independent typing rule, the type is usually written as $\Sigma(x:A).B(x)$. Instead of using case expressions, eliminators, or projection functions for pairs, we use a \emph{pattern-matching lambda} of the form $\lambda(a, b): (A * B). ~ e$.}
+and similarly for the nondependent case. As an independent typing rule, the type is usually written as $\Sigma(x:A).B(x)$. Instead of using case expressions, eliminators, or projection functions for pairs, we use a \emph{pattern-matching lambda} of the form $\lambda(a, b): (A \times B). ~ e$.}
 Then we can define labelled binary trees as follows, sticking the label in the first argument.
 %
 \begin{align*}
-    \BTree ~ A &\coloneqq \W ~ (\Bool * A) ~ (\lambda (b, a): (\Bool * A). ~ \case ~ b ~ \of ~ \langle \false \Rightarrow \bot, \true \Rightarrow \Bool \rangle) \\
+    \BTree ~ A &\coloneqq \W ~ (\Bool \times A) ~ (\lambda (b, a): (\Bool \times A). ~ \case ~ b ~ \of ~ \langle \false \Rightarrow \bot, \true \Rightarrow \Bool \rangle) \\
     \leaf &\coloneqq \sup ~ (\false, a) ~ (\lambda x: \bot. ~ x ~ \BTree) \\
     \node ~ l ~ r &\coloneqq \sup ~ (\true, a) ~ (\lambda b: \Bool. ~ \case ~ b ~ \of ~ \langle \false \Rightarrow l, \true \Rightarrow r \rangle)
 \end{align*}
@@ -674,10 +694,10 @@ Then we can define labelled binary trees as follows, sticking the label in the f
 To define lists (which are essentially labelled naturals) that may possibly be empty, we need the option to supply no label to the base case, which is done using a dependent pair. We use $\_$ to omit unneeded arguments for concision.
 %
 \begin{alignat*}{3}
-    \List ~ A &\coloneqq \W ~ &&(b: \Bool * \case ~ b ~ \of ~ \langle \false \Rightarrow \top, \true \Rightarrow A \rangle) \\
-    &&&(\lambda (b, \_): (\Bool * \_). ~ \case ~ b ~ \of ~ \langle \false \Rightarrow \bot, \true \Rightarrow \top \rangle) \\
-    \nil &\coloneqq \sup ~ &&(\false, \lambda A: \Type. ~ \lambda a: A. ~ a) ~ (\lambda x: \bot. ~ x ~ \List) \\
-    \cons ~ a ~ l &\coloneqq \sup ~ &&(\true, a) ~ (\lambda x: \top. ~ l)
+    \List ~ A &\coloneqq \W ~ &&(b: \Bool \times \case ~ b ~ \of ~ \langle \false \Rightarrow \top, \true \Rightarrow A \rangle) \\
+    &&&(\lambda (b, \_): (\Bool \times \_). ~ \case ~ b ~ \of ~ \langle \false \Rightarrow \bot, \true \Rightarrow \top \rangle) \\
+    \nil &\coloneqq \sup ~ &&(\false, \star) ~ (\lambda x: \bot. ~ x ~ \List) \\
+    \cons ~ a ~ l &\coloneqq \sup ~ &&(\true, a) ~ (\lambda x: \top. ~ \case ~ x ~ \of ~ \langle \star \Rightarrow l \rangle)
 \end{alignat*}
 
 The first immediate downside to using W types as compared to inductive definitions is that we require at the very least an existing type with two distinguishable elements (in our case, $\Bool$) and a (dependent) pair type, whereas with inductive definitions these can be \emph{defined as} inductive types.
@@ -712,7 +732,7 @@ Now that we've sufficiently convinced ourselves that W types are a possible alte
         \and
         \Gamma \vdash w: \W ~ A ~ B
         \\\\
-        \Gamma \vdash p: (a: A) \to (b: B ~ a \to W ~ A ~ B) \to (pw: (x: B ~ a) \to P ~ (b ~ x)) \to P ~ (\sup ~ A ~ B ~ a ~ b)
+        \Gamma \vdash p: (a: A) \to (b: B ~ a \to \W ~ A ~ B) \to (pw: (x: B ~ a) \to P ~ (b ~ x)) \to P ~ (\sup ~ A ~ B ~ a ~ b)
     }{
         \Gamma \vdash \const{wrec} ~ A ~ B ~ P ~ p ~ w: P ~ w
     }
@@ -728,9 +748,37 @@ Now that we've sufficiently convinced ourselves that W types are a possible alte
     }
 \end{mathpar}
 
-\subsection{Recovering Induction Principles}
+\subsection{Recovering Induction Principles?}
 
-\subsection{W Types with Explicit Base Cases}
+Being able to define other inductive types using W types, we should expect to also be able to define their respective eliminators. Taking $\Nat$ as an example, we attempt to define $\const{nrec}$ using the eliminator for W types, $\const{wrec}$.
+
+\begin{align*}
+    &\const{nrec} : (P: \Nat \to \Type) \to (pz: P ~ \zero) \\
+    &\qquad\to (ps: (n: \Nat) \to P ~ n \to P ~ (\succ ~ n)) \\
+    &\qquad\to (n: \Nat) \to P ~ n \\
+    &\const{nrec} ~ P ~ pz ~ ps \coloneqq \const{wrec} ~ \Bool ~ (\lambda b: \Bool. ~ \case ~ b ~ \of ~ \langle \false \Rightarrow \bot, \true \Rightarrow \top \rangle) ~ P \\
+    &\hspace{9.5em} (\lambda a: A. ~ \case ~ a ~ \of \\
+    &\hspace{14em} \false \Rightarrow (\lambda b: \bot \to \Nat. ~ (\lambda pw: (x: \bot) \to P ~ (b ~ x). ~ \hole)) \\
+    &\hspace{14em} \true \Rightarrow (\lambda b: \top \to \Nat. ~ (\lambda pw: (x: \top) \to P ~ (b ~ x). ~ ps ~ (b ~ \star) ~ (pw ~ \star))))
+\end{align*}
+
+We first examine the type of the second branch. By the type of $\const{wrec}$, we are expected to provide a function that returns something of type $P ~ (\sup ~ \true ~ b)$ (omitting the type arguments $A$ and $B$). What we have provided is $ps ~ (b ~ \star) ~ (pw ~ \star)$, which has type $P ~ (\succ ~ (b ~ \star)) \equiv P ~ (\sup ~ \true ~ (\lambda x: \top. ~ \case ~ x ~ \of ~ \langle \star \Rightarrow b ~ \star \rangle))$. By the $\eta$-contraction rule for case expressions, we have $\case ~ x ~ \of ~ \langle \star \Rightarrow b ~ \star \rangle \equiv b ~ x$, and by $\eta$-contraction for functions, we have $\lambda x: \top. ~ b ~ x \equiv b$, so it indeed has the correct type.
+
+Now we examine the hole that we must fill. We have that its type must be $P ~ (\sup ~ \false ~ b)$, and the obvious candidate is $pz$. Unfortunately, it doesn't have the correct type: its type is $P ~ \zero \equiv P ~ (\sup ~ \false ~ (\lambda x: \bot. ~ x ~ \Nat))$. There's nothing that says that $b \equiv \lambda x: \bot. ~ x ~ \Nat$. This problem is not limited the eliminator for naturals: the leaves of binary trees are defined in exactly the same manner, so its first branch would have the same issue.
+%
+\begin{align*}
+    &\const{btrec}: (P: \BTree \to \Type) \to (pl: P ~ \leaf) \\
+    &\qquad\to (pn: (l: \BTree) \to (r: \BTree) \to P ~ l \to P ~ r \to P ~ (\node ~ l ~ r)) \\
+    &\qquad\to (t: \BTree) \to P ~ t \\
+    &\const{btrec} ~ P ~ pl ~ pn \coloneqq \const{wrec} ~ \Bool ~ (\lambda b: \Bool. ~ \case ~ b ~ \of ~ \langle \false \Rightarrow \bot, \true \Rightarrow \Bool \rangle) ~ P \\
+    &\hspace{9.5em} (\lambda a: A. ~ \case ~ a ~ \of \\
+    &\hspace{14em} \false \Rightarrow (\lambda b: \bot \to \BTree. ~ (\lambda pw: (x: \bot) \to P ~ (b ~ x). ~ \hole)) \\
+    &\hspace{14em} \true \Rightarrow (\lambda b: \Bool \to \BTree. ~ \\
+    &\hspace{19em} (\lambda pw: (x: \Bool) \to P ~ (b ~ x). \\
+    &\hspace{21.5em} pn ~ (b ~ \false) ~ (b ~ \true) ~ (pw ~ \false) ~ (pw ~ \true))))
+\end{align*}
+
+\subsection{Explicit Base Cases}
 
 \section{$\mu$ Types}
 
