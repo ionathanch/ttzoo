@@ -46,9 +46,11 @@
 \newcommand{\vcons}{\const{vcons}}
 \newcommand{\W}{\const{W}}
 \renewcommand{\sup}{\const{sup}}
+\newcommand{\zub}{\const{zub}}
 
-\newcommand{\hole}{\colorbox{gray!30}{?}}
 \newcommand{\const}[1]{\text{#1}}
+\newcommand{\meta}[1]{\text{#1}}
+\newcommand{\hole}{\colorbox{gray!30}{?}}
 \newcommand{\data}{\const{data}}
 \newcommand{\Type}{\const{Type}}
 \newcommand{\where}{\const{where}}
@@ -72,6 +74,14 @@
 \newcommand{\subst}{\const{subst}\xspace}
 \newcommand{\refrule}[1]{\textsc{#1}}
 \newcommand{\jmeq}[2]{\prescript{}{#1}{\measeq}_{#2}}
+
+\renewcommand{\sectionautorefname}{Section}
+\renewcommand{\subsectionautorefname}{Subsection}
+\renewcommand{\subsubsectionautorefname}{Subsubsection}
+\renewcommand{\chapterautorefname}{Chapter}
+\renewcommand{\appendixautorefname}{Appendix}
+\renewcommand{\figureautorefname}{Figure}
+\renewcommand{\tableautorefname}{Table}
 
 \setlength{\epigraphwidth}{1.1\epigraphwidth}
 \addbibresource{biblio.bib}
@@ -122,8 +132,9 @@ $\Delta$ is a \emph{telescope} of a variable and its type $(x_1: A_1) \dots (x_n
     \item $\Delta \to B$ means the function type $(x_1: A_1) \to \dots \to (x_n: A_n) \to B$;
     \item $f ~ \Delta ~ \Vec{y}$ means the function application $f ~ x_1 \dots x_n ~ y_1 \dots y_m$;
     \item $\data ~ I ~ \Delta$ in inductive data definitions expands to $\data ~ I ~ (x_1: A_1) \dots (x_n: A_n)$;
-    \item $e[\Delta \mapsto \Vec{a}]$ means the simultaneous substitution $e\overrightarrow{[x_i \mapsto a_i]}$, where $\Vec{a} = a_1 \dots a_n$; and
-    \item $\Gamma \vdash \Vec{a} : \Delta$ means that $\Gamma \vdash a_i: A_i$ all hold.
+    \item $e[\Delta \mapsto \Vec{a}]$ means the simultaneous substitution $e\overrightarrow{[x_i \mapsto a_i]}$, where $\Vec{a} = a_1 \dots a_n$;
+    \item $\Gamma \vdash \Vec{a} : \Delta$ means that $\Gamma \vdash a_i: A_i$ all hold; and
+    \item When otherwise unspecified, and the interpretation of $\Delta$ as a telescope is invalid, $\Delta$ is used to mean the set of variables $\{ x_1, \dots, x_n \}$.
 \end{itemize}
 
 Telescopes may be empty as well, which extends to the above notation abuse in the obvious manners.
@@ -374,24 +385,54 @@ Notice that $P$ and $d_i$ are all terms of function type, but do not have to syn
         \and
         \Gamma \Delta_I (x : I ~ \Vec{p} ~ \Delta_I) \vdash P[y \mapsto \Delta_I] : \Type
         \\\\
-        \Gamma \Delta_i \vdash d_i[\Vec{z} \mapsto \Delta_i] : P ~ \Vec{e}[\Delta_P \mapsto \Vec{p}] ~ (c_i ~ \Vec{p} ~ \Delta_i)
+        \Gamma \Delta_i \vdash d_i[\Vec{z}_i \mapsto \Delta_i] : P ~ \Vec{e}[\Delta_P \mapsto \Vec{p}] ~ (c_i ~ \Vec{p} ~ \Delta_i)
     }{
-        \Gamma \vdash \match ~ x.\Vec{y}.P ~ t ~ \with ~ \langle c_i ~ \Vec{z} \Rightarrow d_i \rangle_i : P[x \mapsto t][\Vec{y} \mapsto \Vec{e}]
+        \Gamma \vdash \match ~ x.\Vec{y}.P ~ t ~ \with ~ \langle c_i ~ \Vec{z}_i \Rightarrow d_i \rangle_i : P[x \mapsto t][\Vec{y} \mapsto \Vec{e}]
     }
 \end{mathpar}
 
-This results in function application in the computation rule for case expressions and substitution in the computation rule for match expressions. Since they don't rely on any of the types, we can instead write them as untyped reduction rules, sometimes referred to as \emph{$\iota$-reduction}.
+This results in function application in the computation rule for case expressions and substitution in the computation rule for match expressions. Since they don't rely on any of the types and clearly compute in one direction, we can instead write them as untyped reduction rules, sometimes referred to as \emph{$\iota$-reduction}.
 %
 \begin{align*}
-    \case ~ P ~ (c_j ~ \Vec{a}) ~ \of ~ \langle c_i \Rightarrow d_i \rangle_i &\rhd_\iota d_i ~ \Vec{a} \\
-    \match ~ x.\Vec{y}.P ~ (c_j ~ \Vec{a}) ~ \with ~ \langle c_i ~ \Vec{z} \Rightarrow d_i \rangle_i &\rhd_\iota d_i[\Vec{z} \mapsto \Vec{a}]
+    \case ~ P ~ (c_j ~ \Vec{a}) ~ \of ~ \langle c_i \Rightarrow d_i \rangle_i &\rhd_\iota d_j ~ \Vec{a} \\
+    \match ~ x.\Vec{y}.P ~ (c_j ~ \Vec{a}) ~ \with ~ \langle c_i ~ \Vec{z}_i \Rightarrow d_i \rangle_i &\rhd_\iota d_j[\Vec{z}_j \mapsto \Vec{a}]
 \end{align*}
 
-Finally, we can give a kind of uniqueness rule for functions involving case or match expressions; as untyped reduction rules, we'll call it \emph{$\eta$-contraction}.
+There is also a uniqueness rule for case and match expressions, but it renders the type theory undecidable (in particular, it allows for equality reflection, as seen in \autoref{ext-eq}). We state the rules here for reference.
 %
 \begin{align*}
-    \case ~ P ~ t ~ \of ~ \langle c_i \Rightarrow \lambda \Delta_i. ~ f ~ (c_i ~ \Delta_i) \rangle_i &\rhd_\eta f ~ t \\
-    \match ~ x.\vec{y}.P ~ t ~ \with ~ \langle c_i ~ \vec{z} \Rightarrow f ~ (c_i ~ \vec{z}) \rangle_i &\rhd_\eta f ~ t
+    \case ~ P ~ t ~ \of ~ \langle c_i \Rightarrow \lambda \Delta_i. ~ e[x \mapsto c_i ~ \Delta_i] \rangle_i &\equiv e[x \mapsto t] \\
+    \match ~ x.\Vec{y}.P ~ t ~ \of \langle c_i ~ \vec{z}_i \Rightarrow e[x \mapsto c_i ~ \vec{z}] \rangle_i &\equiv e[x \mapsto t]
+\end{align*}
+
+This uniqueness rule can instead be split into a number of simpler rules \citep{eta}. They are called $\eta$ or $\gamma$ laws; we stick to calling all of them $\eta$. We start with what is also known as \emph{filling-up rules} \citep{well-ordering}, written as an $\eta$-reduction rule.
+%
+\begin{align*}
+    \case ~ P ~ t ~ \of ~ \langle c_i \Rightarrow \lambda \Delta_i. ~ f ~ (c_i ~ \Delta_i) \rangle_i &\rhd_{\eta_1} f ~ t \\
+    \match ~ x.\Vec{y}.P ~ t ~ \with ~ \langle c_i ~ \vec{z}_i \Rightarrow f ~ (c_i ~ \vec{z}) \rangle_i &\rhd_{\eta_1} f ~ t
+\end{align*}
+
+Note that we should restrict this rule to apply only when $f ~ (c_i ~ \Delta_i)$ is not a redex (usually done syntactically by asserting that $f$ is some neutral form) so that reduction is deterministic. If we don't, then there at least two special cases of $f$ that we need to consider to retain confluence: when $f$ is the identity function, and when $f$ is a constant function. The former is the conventional form of $\eta$-reduction, while the latter is also called a \emph{redundant guard} or \emph{indifference}.
+%
+\begin{align*}
+    \case ~ P ~ t ~ \of ~ \langle c_i \Rightarrow \lambda \Delta_i. ~ c_i ~ \Delta_i \rangle_i &\rhd_{\eta_2} t \\
+    \match ~ x.\Vec{y}.P ~ t ~ \with ~ \langle c_i ~ \vec{z}_i \Rightarrow c_i ~ \vec{z} \rangle_i &\rhd_{\eta_2} t \\
+    \case ~ P ~ t ~ \of ~ \langle c_i \Rightarrow \lambda \Delta_i. ~ e \rangle_i &\rhd_{\eta_3} e && \text{when $\Delta_i \notin \meta{FV}(e)$} \\
+    \match ~ x.\Vec{y}.P ~ t ~ \with ~ \langle c_i ~ \vec{z}_i \Rightarrow e \rangle_i &\rhd_{\eta_3} e && \text{when $\vec{z}_i \notin \meta{FV}(e)$}
+\end{align*}
+
+Finally, we have an $\eta$-reduction rule known as a \emph{repeated guard} or \emph{dead code}, where unreachable branches within branches are eliminated. This appears to have no bearing on the state of confluence.
+%
+\begin{align*}
+    \case ~ P ~ t ~ \of ~ \langle c_i \Rightarrow \lambda \Delta_i. ~ \case ~ P ~ t ~ \of ~ \langle c_j \Rightarrow d_j \rangle_j \rangle_i &\rhd_{\eta_4} \case ~ P ~ t ~ \of ~ \langle c_i \Rightarrow \lambda \Delta_i. ~ d_i ~ \Delta_i \rangle_i \\
+    \match ~ x.\Vec{y}.P ~ t ~ \with ~ \langle c_i ~ \Vec{z}_i \Rightarrow \match ~ x.\Vec{y}.P ~ t ~ \with ~ \langle c_j ~ \Vec{z}_j \Rightarrow d_j \rangle_j \rangle_i &\rhd_{\eta_4} \match ~ x.\Vec{y}.P ~ t ~ \with ~ \langle c_i ~ \Vec{z}_i \Rightarrow d_j[\Vec{z}_j \mapsto \Vec{z}_i] \rangle_i
+\end{align*}
+
+Instead of $\eta_1$-reduction, we could instead use what's called the \emph{move-case} rule. However, this is only an equality rule, not a reduction rule, since there's no case or match expression being eliminated and no particular reason we should choose one direction over the other.
+%
+\begin{align*}
+    \case ~ P ~ t ~ \of ~ \langle c_i \Rightarrow \lambda \Delta_i. ~ f ~ e_i \rangle_i &\equiv f ~ (\case ~ P ~ t ~ \of ~ \langle c_i \Rightarrow \lambda \Delta_i. ~ e_i \rangle_i) &&\text{when $\Delta_i \notin \meta{FV}(f)$} \\
+    \match ~ x.\Vec{y}.P ~ t ~ \with ~ \langle c_i ~ \Vec{z}_i \Rightarrow f ~ d_i \rangle_i &\equiv f ~ (\match ~ x.\Vec{y}.P ~ t ~ \with ~ \langle c_i ~ \Vec{z}_i \Rightarrow d_i \rangle_i) &&\text{when $\Vec{z}_i \notin \meta{FV}(f)$}
 \end{align*}
 
 \subsection{Fixed Points}
@@ -716,6 +757,8 @@ Now that we've sufficiently convinced ourselves that W types are a possible alte
     }
     
     \inferrule*[right=intro-W]{
+        \dots
+        \and
         \Gamma \vdash a: A
         \and
         \Gamma (a: A) \vdash b: B ~ a \to \W ~ A ~ B
@@ -724,9 +767,8 @@ Now that we've sufficiently convinced ourselves that W types are a possible alte
     }
     
     \inferrule*[right=elim-W]{
-        \Gamma \vdash A: \Type
+        \dots
         \and
-        \Gamma \vdash B: A \to \Type
         \and
         \Gamma \vdash P: \W ~ A ~ B \to \Type
         \and
@@ -762,7 +804,7 @@ Being able to define other inductive types using W types, we should expect to al
     &\hspace{14em} \true \Rightarrow (\lambda b: \top \to \Nat. ~ (\lambda pw: (x: \top) \to P ~ (b ~ x). ~ ps ~ (b ~ \star) ~ (pw ~ \star))))
 \end{align*}
 
-We first examine the type of the second branch. By the type of $\const{wrec}$, we are expected to provide a function that returns something of type $P ~ (\sup ~ \true ~ b)$ (omitting the type arguments $A$ and $B$). What we have provided is $ps ~ (b ~ \star) ~ (pw ~ \star)$, which has type $P ~ (\succ ~ (b ~ \star)) \equiv P ~ (\sup ~ \true ~ (\lambda x: \top. ~ \case ~ x ~ \of ~ \langle \star \Rightarrow b ~ \star \rangle))$. By the $\eta$-contraction rule for case expressions, we have $\case ~ x ~ \of ~ \langle \star \Rightarrow b ~ \star \rangle \equiv b ~ x$, and by $\eta$-contraction for functions, we have $\lambda x: \top. ~ b ~ x \equiv b$, so it indeed has the correct type.
+We first examine the type of the second branch. By the type of $\const{wrec}$, we are expected to provide a function that returns something of type $P ~ (\sup ~ \true ~ b)$ (omitting the type arguments $A$ and $B$). What we have provided is $ps ~ (b ~ \star) ~ (pw ~ \star)$, which has type $P ~ (\succ ~ (b ~ \star)) \equiv P ~ (\sup ~ \true ~ (\lambda x: \top. ~ \case ~ x ~ \of ~ \langle \star \Rightarrow b ~ \star \rangle))$. By the $\eta_1$-reduction rule for case expressions, we have $\case ~ x ~ \of ~ \langle \star \Rightarrow b ~ \star \rangle \equiv b ~ x$, and by $\eta$-reduction for functions, we have $\lambda x: \top. ~ b ~ x \equiv b$, so it indeed has the correct type.
 
 Now we examine the hole that we must fill. We have that its type must be $P ~ (\sup ~ \false ~ b)$, and the obvious candidate is $pz$. Unfortunately, it doesn't have the correct type: its type is $P ~ \zero \equiv P ~ (\sup ~ \false ~ (\lambda x: \bot. ~ x ~ \Nat))$. There's nothing that says that $b \equiv \lambda x: \bot. ~ x ~ \Nat$. This problem is not limited the eliminator for naturals: the leaves of binary trees are defined in exactly the same manner, so its first branch would have the same issue.
 %
@@ -779,6 +821,56 @@ Now we examine the hole that we must fill. We have that its type must be $P ~ (\
 \end{align*}
 
 \subsection{Explicit Base Cases}
+
+Perhaps the most unusual part of using W types to define inductive data is the use of $\bot$ and its elimination in defining the base cases. This isn't strictly necessary; we could instead explicitly define a new W type with a constructor specifically for representing constructors that do not take a recursive argument. The computation rules are as expected and written instead in reduction rule form.
+%
+\begin{mathpar}
+    \inferrule*[right=form-W]{
+        \Gamma \vdash Z: \Type
+        \and
+        \Gamma \vdash A: \Type
+        \and
+        \Gamma \vdash B: A \to \Type
+    }{
+        \Gamma \vdash \W ~ Z ~ A ~ B: \Type
+    }
+    
+    \inferrule*[right=intro-W-zub]{
+        \dots
+        \and
+        \Gamma \vdash z: Z
+    }{
+        \Gamma \vdash \zub ~ Z ~ A ~ B ~ z: \W ~ Z ~ A ~ B
+    }
+    
+    \inferrule*[right=intro-W-sup]{
+        \dots
+        \and
+        \Gamma \vdash a: A
+        \and
+        \Gamma (a: A) \vdash b: B ~ a \to \W ~ Z ~ A ~ B
+    }{
+        \Gamma \vdash \sup ~ Z ~ A ~ B ~ a ~ b: \W ~ Z ~ A ~ B
+    }
+    
+    \inferrule*[right=elim-W]{
+        \dots
+        \and
+        \Gamma \vdash P: \W ~ Z ~ A ~ B \to \Type
+        \and
+        \Gamma \vdash w: \W ~ Z ~ A ~ B
+        \and
+        \Gamma \vdash pz: (z: Z) \to P ~ (\zub ~ Z ~ A ~ B ~ z)
+        \\\\
+        \Gamma \vdash ps: (a: A) \to (b: B ~ a \to \W ~ Z ~ A ~ B) \to (pw: (x: B ~ a) \to P ~ (b ~ x)) \to P ~ (\sup ~ A ~ B ~ Z ~ a ~ b)
+    }{
+        \Gamma \vdash \const{wrec} ~ Z ~ A ~ B ~ P ~ pz ~ ps ~ w: P ~ w
+    }
+\end{mathpar}
+\begin{align*}
+    \const{wrec} ~ Z ~ A ~ B ~ P ~ pz ~ ps ~ (\zub ~ Z ~ A ~ B ~ z) &\rhd_{\mu} pz ~ z \\
+    \const{wrec} ~ Z ~ A ~ B ~ P ~ pz ~ ps ~ (\sup ~ Z ~ A ~ B ~ a ~ b) &\rhd_{\mu} ps ~ a ~ b ~ (\lambda x: B ~ a. ~ \const{wrec} ~ Z ~ A ~ B ~ P ~ pz ~ ps ~ (b ~ x))
+\end{align*}
 
 \section{$\mu$ Types}
 
@@ -1100,7 +1192,7 @@ An interesting property of heterogenous equality is that we can prove \rip (for 
 
 The key is the heterogenous equality used in $\refl^\star_a \stareq q$: The term on the left has type $a \stareq^A_A a$, whereas the term on the right has type $a \stareq^A_B b$. In the homogenous version of \jelim, we would have to equate a term of type $a =_A a$ to a term of type $a =_A b$, which isn't possible with homogenous equality. In general, anything provable using \jelim can also be proven with $\jelim^\star$, but not the other way around.
 
-\subsection{Extensional Equality}
+\subsection{Extensional Equality}\label{ext-eq}
 
 So far, with all of our propositional equalities, definitional equality remains \emph{intensional}, as opposed to \emph{extensional}, which roughly means that everything that is provably (propositionally) equal is (definitionally) equal. An important property to note is that type checking is decidable for intensional definitional equality (which we refer to as computational equality) and undecidable for \emph{extensional} definitional equality (which we refer to as judgemental equality).%
 \footnote{Different sources assign different meanings to these terms. For instance, \citet{nlab-equality} distinguishes between definitional equality, which behaves merely like our $\coloneqq$, and computational equality, which describes a unidirectional notion of evaluation. \citet{ext-concepts}, on the other hand, says:
