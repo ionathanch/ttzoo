@@ -398,6 +398,8 @@ This results in function application in the computation rule for case expression
     \match ~ x.\Vec{y}.P ~ (c_j ~ \Vec{a}) ~ \with ~ \langle c_i ~ \Vec{z}_i \Rightarrow d_i \rangle_i &\rhd_\iota d_j[\Vec{z}_j \mapsto \Vec{a}]
 \end{align*}
 
+\subsubsection{Problems with Uniqueness Rules}\label{uniqueness}
+
 There is also a uniqueness rule for case and match expressions, but it renders the type theory undecidable (in particular, it allows for equality reflection, as seen in \autoref{ext-eq}). We state the rules here for reference.
 %
 \begin{align*}
@@ -405,30 +407,57 @@ There is also a uniqueness rule for case and match expressions, but it renders t
     \match ~ x.\Vec{y}.P ~ t ~ \of \langle c_i ~ \vec{z}_i \Rightarrow e[x \mapsto c_i ~ \vec{z}] \rangle_i &\equiv e[x \mapsto t]
 \end{align*}
 
-This uniqueness rule can instead be split into a number of simpler rules \citep{eta}. They are called $\eta$ or $\gamma$ laws; we stick to calling all of them $\eta$. We start with what is also known as \emph{filling-up rules} \citep{well-ordering}, written as an $\eta$-reduction rule.
+This uniqueness rule can instead be split into a number of simpler rules \citep{eta}. They are called $\eta$ or $\gamma$ laws; we stick to calling all of them $\eta$. The first could be considered as the traditional $\eta$-reduction rules: if we rebuild the inductive datum from the pieces obtained from decomposition, then we should simply return the original target.
+%
+\begin{align*}
+    \case ~ P ~ t ~ \of ~ \langle c_i \Rightarrow \lambda \Delta_i. ~ c_i ~ \Delta_i \rangle_i &\rhd_{\eta} t \\
+    \match ~ x.\Vec{y}.P ~ t ~ \with ~ \langle c_i ~ \vec{z}_i \Rightarrow c_i ~ \vec{z} \rangle_i &\rhd_{\eta} t
+\end{align*}
+
+Sometimes this rule isn't strong enough, as we will see in \autoref{wtypes}. We could add what are also known as \emph{filling-up rules} \citep{well-ordering}.
 %
 \begin{align*}
     \case ~ P ~ t ~ \of ~ \langle c_i \Rightarrow \lambda \Delta_i. ~ f ~ (c_i ~ \Delta_i) \rangle_i &\rhd_{\eta_1} f ~ t \\
     \match ~ x.\Vec{y}.P ~ t ~ \with ~ \langle c_i ~ \vec{z}_i \Rightarrow f ~ (c_i ~ \vec{z}) \rangle_i &\rhd_{\eta_1} f ~ t
 \end{align*}
 
-Note that we should restrict this rule to apply only when $f ~ (c_i ~ \Delta_i)$ is not a redex (usually done syntactically by asserting that $f$ is some neutral form) so that reduction is deterministic. If we don't, then there at least two special cases of $f$ that we need to consider to retain confluence: when $f$ is the identity function, and when $f$ is a constant function. The former is the conventional form of $\eta$-reduction, while the latter is also called a \emph{redundant guard} or \emph{indifference}.
+However, this breaks confluence! Consider a mere unit type $\top$ with a single inhabitant $\star$ and the following term:
 %
 \begin{align*}
-    \case ~ P ~ t ~ \of ~ \langle c_i \Rightarrow \lambda \Delta_i. ~ c_i ~ \Delta_i \rangle_i &\rhd_{\eta_2} t \\
-    \match ~ x.\Vec{y}.P ~ t ~ \with ~ \langle c_i ~ \vec{z}_i \Rightarrow c_i ~ \vec{z} \rangle_i &\rhd_{\eta_2} t \\
-    \case ~ P ~ t ~ \of ~ \langle c_i \Rightarrow \lambda \Delta_i. ~ e \rangle_i &\rhd_{\eta_3} e && \text{when $\Delta_i \notin \meta{FV}(e)$} \\
-    \match ~ x.\Vec{y}.P ~ t ~ \with ~ \langle c_i ~ \vec{z}_i \Rightarrow e \rangle_i &\rhd_{\eta_3} e && \text{when $\vec{z}_i \notin \meta{FV}(e)$}
+    \data ~ &\top: \Type ~ \where \\
+    \star &: \top
+\end{align*}
+\begin{align*}
+    \lambda t: \top. ~ \case ~ &(\lambda t: \top. \Type) ~ t ~ \of \\
+    &\star \Rightarrow (\lambda t: \top. \bot) ~ \star
 \end{align*}
 
-Finally, we have an $\eta$-reduction rule known as a \emph{repeated guard} or \emph{dead code}, where unreachable branches within branches are eliminated. This appears to have no bearing on the state of confluence.
+If we apply $\beta$-reduction to the function application in the branch first, then we end up with the term (omitting the motive) $$\lambda t: \top ~ \case ~ t ~ \of ~ \langle \star \Rightarrow \bot \rangle$$ but if we apply $\eta_1$-reduction to the case expression first followed by a $\beta$-reduction, we get $\lambda t: \top. ~ \bot$. Neither term can reduce any further, and they are not equal. Furthermore, this problem is clearly not unique to $\top$, since the case expression for any type with $\bot$ in all of its branches is similarly ``stuck''. This suggests that we should add a rule that discards the case construct when all branches are equal and constant. Such an $\eta$-reduction rule is also called \emph{redundant guard} or \emph{indifference}.
 %
 \begin{align*}
-    \case ~ P ~ t ~ \of ~ \langle c_i \Rightarrow \lambda \Delta_i. ~ \case ~ P ~ t ~ \of ~ \langle c_j \Rightarrow d_j \rangle_j \rangle_i &\rhd_{\eta_4} \case ~ P ~ t ~ \of ~ \langle c_i \Rightarrow \lambda \Delta_i. ~ d_i ~ \Delta_i \rangle_i \\
-    \match ~ x.\Vec{y}.P ~ t ~ \with ~ \langle c_i ~ \Vec{z}_i \Rightarrow \match ~ x.\Vec{y}.P ~ t ~ \with ~ \langle c_j ~ \Vec{z}_j \Rightarrow d_j \rangle_j \rangle_i &\rhd_{\eta_4} \match ~ x.\Vec{y}.P ~ t ~ \with ~ \langle c_i ~ \Vec{z}_i \Rightarrow d_j[\Vec{z}_j \mapsto \Vec{z}_i] \rangle_i
+    \case ~ P ~ t ~ \of ~ \langle c_i \Rightarrow \lambda \Delta_i. ~ e \rangle_i &\rhd_{\eta_2} e && \text{when $\Delta_i \notin \meta{FV}(e)$} \\
+    \match ~ x.\Vec{y}.P ~ t ~ \with ~ \langle c_i ~ \vec{z}_i \Rightarrow e \rangle_i &\rhd_{\eta_2} e && \text{when $\vec{z}_i \notin \meta{FV}(e)$}
 \end{align*}
 
-Instead of $\eta_1$-reduction, we could instead use what's called the \emph{move-case} rule. However, this is only an equality rule, not a reduction rule, since there's no case or match expression being eliminated and no particular reason we should choose one direction over the other.
+But this is even worse --- this breaks \emph{subject reduction}! Consider now the following term:
+$$\lambda P: \top \to \Type. ~ \lambda f: (t: \top) \to P ~ t. ~ \lambda t: \top. ~ \case ~ P ~ t ~ \of ~ \langle \star \Rightarrow f ~ \star \rangle$$
+The type of this term is $(P: \top \to \Type) \to (f: (t: \top) \to P ~ t) \to (t: \top) \to P ~ t$. However, if we perform an $\eta_2$-reduction, the body of the innermost function is $f ~ \star$, and the type of the term is instead $(P: \top \to \Type) \to (f: (t: \top) \to P ~ t) \to (t: \top) \to P ~ \star$. Curiously, this problem occurs only with any inductive definition shaped like $\top$.
+
+There is yet another $\eta$-reduction rule that behaves even worse, known as \emph{repeated guard} or \emph{dead code}, where unreachable branches within branches are eliminated.
+%
+\begin{align*}
+    \case ~ P ~ t ~ \of ~ \langle c_i \Rightarrow \lambda \Delta_i. ~ \case ~ P ~ t ~ \of ~ \langle c_j \Rightarrow d_j \rangle_j \rangle_i &\rhd_{\eta_3} \case ~ P ~ t ~ \of ~ \langle c_i \Rightarrow \lambda \Delta_i. ~ d_i ~ \Delta_i \rangle_i \\
+    \match ~ x.\Vec{y}.P ~ t ~ \with ~ \langle c_i ~ \Vec{z}_i \Rightarrow \match ~ x.\Vec{y}.P ~ t ~ \with ~ \langle c_j ~ \Vec{z}_j \Rightarrow d_j \rangle_j \rangle_i &\rhd_{\eta_3} \match ~ x.\Vec{y}.P ~ t ~ \with ~ \langle c_i ~ \Vec{z}_i \Rightarrow d_j[\Vec{z}_j \mapsto \Vec{z}_i] \rangle_i
+\end{align*}
+We examine a similar example but this time with a nested case expression that we collapse.
+\begin{align*}
+    &\lambda P: \top \to \Type. ~ \lambda f: (t: \top) \to P ~ t. ~ \lambda t: \top. ~ \case ~ (\lambda \_: \top. ~ P ~ t) ~ t ~ \of ~ \langle \star \Rightarrow \case ~ P ~ t ~ \of ~ \langle \star \Rightarrow f ~ \star \rangle \rangle \\
+    \rhd_{\eta_3} ~ &\lambda P: \top \to \Type. ~ \lambda f: (t: \top) \to P ~ t. ~ \lambda t: \top. ~ \case ~ (\lambda \_: \top. ~ P ~ t) ~ t ~ \of ~ \langle \star \Rightarrow f ~ \star \rangle
+\end{align*}
+
+The body of the branch in the reduced term has type $P ~ \star$, but it needs to be of type $P ~ t$, so the reduced term is not even well-typed.
+
+Finally, instead of $\eta_1$-reduction, it's sometimes replaced by what's called the \emph{move-case} rule. However, this is only an equality rule, not a reduction rule, since there's no case or match expression being eliminated and no particular reason we should choose one direction over the other.
 %
 \begin{align*}
     \case ~ P ~ t ~ \of ~ \langle c_i \Rightarrow \lambda \Delta_i. ~ f ~ e_i \rangle_i &\equiv f ~ (\case ~ P ~ t ~ \of ~ \langle c_i \Rightarrow \lambda \Delta_i. ~ e_i \rangle_i) &&\text{when $\Delta_i \notin \meta{FV}(f)$} \\
@@ -680,7 +709,7 @@ We use the infix notation $a =_A a$ to mean $(=) ~ A ~ a ~ a$ and occasionally o
 
 Then what was formerly $\fzero ~ \zero: \Fin ~ (\succ ~ \zero)$ now becomes $\fzero ~ \zero ~ (\refl ~ (\succ \zero)): \Fin ~ (\succ ~ \zero)$, trivially requiring an extra proof of equality. In short, we can turn all indices into parameters so long as we have the indexed equality type as our one single inductive definition with indices.
 
-\section{W Types}
+\section{W Types}\label{wtypes}
 
 So far, we have only seen inductive definitions whose constructor arguments are \emph{not} functions. The simplest such inductive definition that doesn't rely on other definitions are the \emph{well-founded trees}, also known as \emph{W types}.
 %
@@ -691,7 +720,7 @@ So far, we have only seen inductive definitions whose constructor arguments are 
 
 Occasionally the type is written as $\W (x: A). B(x)$, just as function types may be written as $\Pi (x: A). B(x)$. Intuitively, when interpreted as a tree, there is a branch for each element $a: A$, and a subtree for each element in $B ~ a$. As such, the constructor $\sup ~ a ~ b$ is also written infixively as $a \lhd b$ to evoke ``a picture of a tree growing rightward from a root'' \citep{mcbride-wtype}.
 
-W types can in fact also be interpreted as an encoding for inductive definitions themselves, where the branches are constructors and the subtrees are the recursive arguments. To do so, we need a few base types on top of which we build: a type $\bot$ with no inhabitants, a type $\top$ with (at least) one inhabitant, and a boolean type.\footnote{We previously assumed the existence of $\bot$, interpreting it as the type representing propositional falsehood; we now formalize it as the type asserting that every type has an inhabitant. We can also define $\top$ and $\Bool$ using explicit formation, introduction, elimination, and uniqueness rules, but they would look exactly as expected anyway, and this way we can use case expressions, which are somewhat prettier than eliminators.}
+W types can in fact also be interpreted as an encoding for inductive definitions themselves, where the branches are constructors and the subtrees are the recursive arguments. To do so, we need a few base types on top of which we build: a type $\bot$ with no inhabitants, a type $\top$ with (at least) one inhabitant, a boolean type, and a dependent pair type (with some special syntax).\footnote{We previously assumed the existence of $\bot$, interpreting it as the type representing propositional falsehood; we now formalize it as the type asserting that every type has an inhabitant. We can also define $\top$, $\Bool$, and pairs using explicit typing rules, but they would look exactly as expected anyway, and this way we can use case expressions, which are somewhat prettier than eliminators.} We also explicitly state some reduction rules; as seen in \autoref{uniqueness}, having all $\eta$-reduction rules for all case and match expressions can be problematic, so we restrict ourselves to only the ones we need.
 %
 \begin{align*}
     \bot &: \Type \\
@@ -700,7 +729,17 @@ W types can in fact also be interpreted as an encoding for inductive definitions
     \star &: \top \\
     \data ~ \Bool &: \Type ~ \where \\
     \false &: \Bool \\
-    \true &: \Bool
+    \true &: \Bool \\
+    \data ~ (x: A \times B) &: \Type ~ \where \\
+    (a, b) &: (x: A \times B)
+\end{align*}
+\begin{align*}
+    \Gamma (t: \top) \vdash t &\rhd_{\eta_1} \star \\
+    (\lambda t: \top. ~ f ~ \star) &\rhd_{\eta_2} f \\
+    \case ~ P ~ t ~ \of ~ \langle \true \Rightarrow \true, \false \Rightarrow \false \rangle &\rhd_{\eta} t \\
+    \case ~ P ~ t ~ \of ~ \langle \true \Rightarrow f ~ \true, \false \Rightarrow f ~ \false \rangle &\rhd_{\eta_1} f ~ t \\
+    \case ~ P ~ t ~ \of ~ \langle \true \Rightarrow e, \false \Rightarrow e \rangle &\rhd_{\eta_2} e \\
+    (\lambda (a, b): (x: A \times B). ~ e) ~ (l, r) &\rhd_\beta e[a \mapsto l, b \mapsto r]
 \end{align*}
 
 Now we are able to define some basic structures such as the naturals and binary trees.
@@ -708,7 +747,7 @@ Now we are able to define some basic structures such as the naturals and binary 
 \begin{align*}
     \Nat &\coloneqq \W ~ \Bool ~ (\lambda b: \Bool. ~ \case ~ b ~ \of ~ \langle \false \Rightarrow \bot, \true \Rightarrow \top \rangle) \\
     \zero &\coloneqq \sup ~ \false ~ (\lambda x: \bot. ~ x ~ \Nat) \\
-    \succ ~ n &\coloneqq \sup ~ \true ~ (\lambda x: \top. ~ \case ~ x ~ \of ~ \langle \star \Rightarrow n \rangle)
+    \succ ~ n &\coloneqq \sup ~ \true ~ (\lambda x: \top. ~ n)
 \end{align*}
 \begin{align*}
     \BTree &\coloneqq \W ~ \Bool ~ (\lambda b: \Bool. ~ \case ~ b ~ \of ~ \langle \false \Rightarrow \bot, \true \Rightarrow \Bool \rangle) \\
@@ -716,15 +755,7 @@ Now we are able to define some basic structures such as the naturals and binary 
     \node ~ l ~ r &\coloneqq \sup ~ \true ~ (\lambda b: \Bool. ~ \case ~ b ~ \of ~ \langle \false \Rightarrow l, \true \Rightarrow r \rangle)
 \end{align*}
 
-Because the second argument always needs to produce a W type, the base cases ask for a $\bot$ so that the required W type can be produced at will. In the step cases, we return the recursive arguments depending on the input. To define structures that also non-recursive arguments, we also need to assume the existence of pairs, whose types are written as $(x: A \times B)$ in the dependent case
-and $(A \times B)$ in the nondependent case.% TODO: Maybe this belongs in the Examples section?
-\footnote{The corresponding inductive type for the dependent case would be
-\begin{align*}
-    \data ~ &\const{Pair} ~ (A: \Type) ~ (B: A \to \Type): \Type ~ \where \\
-    &\const{pair}: (x: A) \to B ~ x \to \const{Pair} ~ A ~ B
-\end{align*}
-and similarly for the nondependent case. As an independent typing rule, the type is usually written as $\Sigma(x:A).B(x)$. Instead of using case expressions, eliminators, or projection functions for pairs, we use a \emph{pattern-matching lambda} of the form $\lambda(a, b): (A \times B). ~ e$.}
-Then we can define labelled binary trees as follows, sticking the label in the first argument.
+Because the second argument always needs to produce a W type, the base cases ask for a $\bot$ so that the required W type can be produced at will. In the step cases, we return the recursive arguments depending on the input. To define structures that also contain non-recursive arguments, we can use (dependent) pairs. Then we define labelled binary trees as follows, sticking the label in the first argument.
 %
 \begin{align*}
     \BTree ~ A &\coloneqq \W ~ (\Bool \times A) ~ (\lambda (b, a): (\Bool \times A). ~ \case ~ b ~ \of ~ \langle \false \Rightarrow \bot, \true \Rightarrow \Bool \rangle) \\
@@ -738,10 +769,10 @@ To define lists (which are essentially labelled naturals) that may possibly be e
     \List ~ A &\coloneqq \W ~ &&(b: \Bool \times \case ~ b ~ \of ~ \langle \false \Rightarrow \top, \true \Rightarrow A \rangle) \\
     &&&(\lambda (b, \_): (\Bool \times \_). ~ \case ~ b ~ \of ~ \langle \false \Rightarrow \bot, \true \Rightarrow \top \rangle) \\
     \nil &\coloneqq \sup ~ &&(\false, \star) ~ (\lambda x: \bot. ~ x ~ \List) \\
-    \cons ~ a ~ l &\coloneqq \sup ~ &&(\true, a) ~ (\lambda x: \top. ~ \case ~ x ~ \of ~ \langle \star \Rightarrow l \rangle)
+    \cons ~ a ~ l &\coloneqq \sup ~ &&(\true, a) ~ (\lambda x: \top. ~ l)
 \end{alignat*}
 
-The first immediate downside to using W types as compared to inductive definitions is that we require at the very least an existing type with two distinguishable elements (in our case, $\Bool$) and a (dependent) pair type, whereas with inductive definitions these can be \emph{defined as} inductive types.
+The first immediate downside to using W types as compared to inductive definitions is that we require at the very least a unit type $\top$, an existing type $\Bool$ with two distinguishable elements and a (dependent) pair type, whereas with inductive definitions these can be \emph{defined as} inductive types.
 
 \subsection{Typing Rules}
 
@@ -799,23 +830,23 @@ Being able to define other inductive types using W types, we should expect to al
     &\qquad\to (ps: (n: \Nat) \to P ~ n \to P ~ (\succ ~ n)) \\
     &\qquad\to (n: \Nat) \to P ~ n \\
     &\const{nrec} ~ P ~ pz ~ ps \coloneqq \const{wrec} ~ \Bool ~ (\lambda b: \Bool. ~ \case ~ b ~ \of ~ \langle \false \Rightarrow \bot, \true \Rightarrow \top \rangle) ~ P \\
-    &\hspace{9.5em} (\lambda a: A. ~ \case ~ a ~ \of \\
-    &\hspace{14em} \false \Rightarrow (\lambda b: \bot \to \Nat. ~ (\lambda pw: (x: \bot) \to P ~ (b ~ x). ~ \hole)) \\
-    &\hspace{14em} \true \Rightarrow (\lambda b: \top \to \Nat. ~ (\lambda pw: (x: \top) \to P ~ (b ~ x). ~ ps ~ (b ~ \star) ~ (pw ~ \star))))
+    &\hspace{9.5em} (\lambda a: \Bool. ~ \case ~ a ~ \of \\
+    &\hspace{15.5em} \false \Rightarrow (\lambda b: \bot \to \Nat. ~ (\lambda pw: (x: \bot) \to P ~ (b ~ x). ~ \hole)) \\
+    &\hspace{15.5em} \true \Rightarrow (\lambda b: \top \to \Nat. ~ (\lambda pw: (x: \top) \to P ~ (b ~ x). ~ ps ~ (b ~ \star) ~ (pw ~ \star))))
 \end{align*}
 
-We first examine the type of the second branch. By the type of $\const{wrec}$, we are expected to provide a function that returns something of type $P ~ (\sup ~ \true ~ b)$ (omitting the type arguments $A$ and $B$). What we have provided is $ps ~ (b ~ \star) ~ (pw ~ \star)$, which has type $P ~ (\succ ~ (b ~ \star)) \equiv P ~ (\sup ~ \true ~ (\lambda x: \top. ~ \case ~ x ~ \of ~ \langle \star \Rightarrow b ~ \star \rangle))$. By the $\eta_1$-reduction rule for case expressions, we have $\case ~ x ~ \of ~ \langle \star \Rightarrow b ~ \star \rangle \equiv b ~ x$, and by $\eta$-reduction for functions, we have $\lambda x: \top. ~ b ~ x \equiv b$, so it indeed has the correct type.
+We first examine the type of the second branch. By the type of $\const{wrec}$, we are expected to provide a function that returns something of type $P ~ (\sup ~ \true ~ b)$ (omitting the type arguments $A$ and $B$). What we have provided is $ps ~ (b ~ \star) ~ (pw ~ \star)$, which has type $P ~ (\succ ~ (b ~ \star)) \equiv P ~ (\sup ~ \true ~ (\lambda x: \top. ~ b ~ \star))$. By $\eta_2$-reduction for $\top$, this becomes the correct type.
 
 Now we examine the hole that we must fill. We have that its type must be $P ~ (\sup ~ \false ~ b)$, and the obvious candidate is $pz$. Unfortunately, it doesn't have the correct type: its type is $P ~ \zero \equiv P ~ (\sup ~ \false ~ (\lambda x: \bot. ~ x ~ \Nat))$. There's nothing that says that $b \equiv \lambda x: \bot. ~ x ~ \Nat$. This problem is not limited the eliminator for naturals: the leaves of binary trees are defined in exactly the same manner, so its first branch would have the same issue.
-%
+
 \begin{align*}
     &\const{btrec}: (P: \BTree \to \Type) \to (pl: P ~ \leaf) \\
     &\qquad\to (pn: (l: \BTree) \to (r: \BTree) \to P ~ l \to P ~ r \to P ~ (\node ~ l ~ r)) \\
     &\qquad\to (t: \BTree) \to P ~ t \\
     &\const{btrec} ~ P ~ pl ~ pn \coloneqq \const{wrec} ~ \Bool ~ (\lambda b: \Bool. ~ \case ~ b ~ \of ~ \langle \false \Rightarrow \bot, \true \Rightarrow \Bool \rangle) ~ P \\
-    &\hspace{9.5em} (\lambda a: A. ~ \case ~ a ~ \of \\
-    &\hspace{14em} \false \Rightarrow (\lambda b: \bot \to \BTree. ~ (\lambda pw: (x: \bot) \to P ~ (b ~ x). ~ \hole)) \\
-    &\hspace{14em} \true \Rightarrow (\lambda b: \Bool \to \BTree. ~ \\
+    &\hspace{9.5em} (\lambda a: \Bool. ~ \case ~ a ~ \of \\
+    &\hspace{15.5em} \false \Rightarrow (\lambda b: \bot \to \BTree. ~ (\lambda pw: (x: \bot) \to P ~ (b ~ x). ~ \hole)) \\
+    &\hspace{15.5em} \true \Rightarrow (\lambda b: \Bool \to \BTree. ~ \\
     &\hspace{19em} (\lambda pw: (x: \Bool) \to P ~ (b ~ x). \\
     &\hspace{21.5em} pn ~ (b ~ \false) ~ (b ~ \true) ~ (pw ~ \false) ~ (pw ~ \true))))
 \end{align*}
@@ -871,6 +902,26 @@ Perhaps the most unusual part of using W types to define inductive data is the u
     \const{wrec} ~ Z ~ A ~ B ~ P ~ pz ~ ps ~ (\zub ~ Z ~ A ~ B ~ z) &\rhd_{\mu} pz ~ z \\
     \const{wrec} ~ Z ~ A ~ B ~ P ~ pz ~ ps ~ (\sup ~ Z ~ A ~ B ~ a ~ b) &\rhd_{\mu} ps ~ a ~ b ~ (\lambda x: B ~ a. ~ \const{wrec} ~ Z ~ A ~ B ~ P ~ pz ~ ps ~ (b ~ x))
 \end{align*}
+
+The inhabitants of $Z$ select the base case that we need, just as those of $A$ select the step cases. To verify that this works, we again define the naturals using our new W type (omitting once more the type arguments $Z, A, B$).
+%
+\begin{align*}
+    \Nat &\coloneqq \W ~ \top ~ \top ~ (\lambda x: \top. ~ \top) \\
+    \zero &\coloneqq \zub ~ \star \\
+    \succ ~ n &\coloneqq \sup \star (\lambda x: \top. ~ n)
+\end{align*}
+
+Now we are able to define the eliminator for naturals as expected.
+
+\begin{align*}
+    &\const{nrec} : (P: \Nat \to \Type) \to (pz: P ~ \zero) \\
+    &\qquad\to (ps: (n: \Nat) \to P ~ n \to P ~ (\succ ~ n)) \\
+    &\qquad\to (n: \Nat) \to P ~ n \\
+    &\const{nrec} ~ P ~ pz ~ ps \coloneqq \const{wrec} ~ \top ~ \top ~ (\lambda x: \top. ~ \top) ~ P ~ (\lambda x: \top. ~ pz) \\
+    &\hspace{9.5em} (\lambda x: \top. ~ \lambda b: \top \to \Nat. ~ \lambda pw: (x: \bot) \to P ~ (b ~ x). ~ ps ~ (b ~ \star) ~ (pw ~ \star))
+\end{align*}
+
+In the base case, we are expected to provide a $P ~ (\zub ~ z)$ when $z: \top$, which $\eta_1$-reduces to $P ~ (\zub ~ \star)$, and we give $pz$, which has exactly that type. In the step case, we are expected to provide a function that returns a $P ~ (\sup ~ \star ~ b)$, and we give $ps ~ (b ~ \star) ~ (pw ~ \star)$, whose type is $P ~ (\sup ~ \star ~ (\lambda x: \top. ~ b ~ \star))$. Once again, by $\eta_2$-reduction for $\top$, this reduces to the correct type.
 
 \section{$\mu$ Types}
 
