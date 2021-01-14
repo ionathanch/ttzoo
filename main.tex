@@ -74,6 +74,10 @@
 \newcommand{\subst}{\const{subst}\xspace}
 \newcommand{\refrule}[1]{\textsc{#1}}
 \newcommand{\jmeq}[2]{\prescript{}{#1}{\measeq}_{#2}}
+\newcommand{\ite}[3]{\const{if} ~ #1 ~ \const{then} ~ #2 ~ \const{else} ~ #3}
+\newcommand{\pair}[5]{(#1, #2) ~ \const{as} ~ (#3: #4 \times #5)}
+\renewcommand{\fst}{\const{fst}}
+\renewcommand{\snd}{\const{snd}}
 
 \renewcommand{\sectionautorefname}{Section}
 \renewcommand{\subsectionautorefname}{Subsection}
@@ -398,16 +402,86 @@ This results in function application in the computation rule for case expression
     \match ~ x.\Vec{y}.P ~ (c_j ~ \Vec{a}) ~ \with ~ \langle c_i ~ \Vec{z}_i \Rightarrow d_i \rangle_i &\rhd_\iota d_j[\Vec{z}_j \mapsto \Vec{a}]
 \end{align*}
 
-\subsubsection{Problems with Uniqueness Rules}\label{uniqueness}
+\subsubsection{Uniqueness Rules}\label{uniqueness}
 
 There is also a uniqueness rule for case and match expressions, but it renders the type theory undecidable (in particular, it allows for equality reflection, as seen in \autoref{ext-eq}). We state the rules here for reference.
 %
-\begin{align*}
-    \case ~ P ~ t ~ \of ~ \langle c_i \Rightarrow \lambda \Delta_i. ~ e[x \mapsto c_i ~ \Delta_i] \rangle_i &\equiv e[x \mapsto t] \\
-    \match ~ x.\Vec{y}.P ~ t ~ \of \langle c_i ~ \vec{z}_i \Rightarrow e[x \mapsto c_i ~ \vec{z}] \rangle_i &\equiv e[x \mapsto t]
-\end{align*}
+\begin{mathpar}
+    \inferrule*[right=case-uniq]{
+        \dots
+        \and
+        \Gamma \vdash t: I ~ \Vec{p} ~ \Vec{e}
+        \and
+        \Gamma (x: I ~ \Vec{p} ~ \Vec{e}) \vdash d: P ~ \Vec{e} ~ x
+    }{
+        \Gamma \vdash \case ~ P ~ t ~ \of ~ \langle c_i \Rightarrow \lambda \Delta_i. ~ d[x \mapsto c_i ~ \Delta_i] \rangle_i \equiv d[x \mapsto t] : P ~ \Vec{e} ~ t
+    }
+    
+    \inferrule*[right=match-uniq]{
+        \dots
+        \and
+        \Gamma \vdash t: I ~ \Vec{p} ~ \Vec{e}
+        \and
+        \Gamma (x: I ~ \Vec{p} ~ \Vec{e}) \vdash d: P[\Vec{y} \mapsto \Vec{e}]
+    }{
+        \Gamma \vdash \match ~ x.\Vec{y}.P ~ t ~ \of \langle c_i ~ \vec{z}_i \Rightarrow d[x \mapsto c_i ~ \vec{z}] \rangle_i \equiv d[x \mapsto t] : P[x \mapsto t][\Vec{y} \mapsto \Vec{e}]
+    }
+\end{mathpar}
 
-This uniqueness rule can instead be split into a number of simpler rules \citep{eta}. They are called $\eta$ or $\gamma$ laws; we stick to calling all of them $\eta$. The first could be considered as the traditional $\eta$-reduction rules: if we rebuild the inductive datum from the pieces obtained from decomposition, then we should simply return the original target.
+This uniqueness rule can instead be split into a number of simpler rules \citep{eta}, some of which are called $\eta$- or $\gamma$-reduction rules. We present a few of them here in a manner that suggests at a decidable algorithm for checking equality by using the reflexive, transitive, congruent closure $\rhd^*$ of our usual reduction rules. The first one says that if all that the case or match expression does is to rebuild the destructed target, then it should be equal to the target itself.
+%
+\begin{mathpar}
+    \inferrule*[right=case-$\eta_1$]{
+        \Gamma \vdash e_1 \rhd^* \case ~ P ~ e_1' ~ \of ~ \langle c_i \Rightarrow d_i \rangle_i
+        \\\\
+        \Gamma \vdash e_2 \rhd^* e_2'
+        \and
+        \Gamma \vdash d_i \equiv c_i : \Delta_i \to I ~ \Vec{p} ~ \Vec{e}
+        \and
+        \Gamma \vdash e_1' \equiv e_2' : I ~ \Vec{p} ~ \Vec{e}
+    }{
+        \Gamma \vdash e_1 \equiv e_2 : I ~ \Vec{p} ~ \Vec{e}
+    }
+    
+    \inferrule*[right=match-$\eta_1$]{
+        \Gamma \vdash e_1 \rhd^* \match ~ x.\Vec{y}.P ~ e_1' ~ \with ~ \langle c_i ~ \Vec{z}_i \Rightarrow d_i \rangle_i
+        \\\\
+        \Gamma \vdash e_2 \rhd^* e_2'
+        \and
+        \Gamma \vdash d_i \equiv c_i ~ \Vec{z}_i : I ~ \Vec{p} ~ \Vec{e}
+        \and
+        \Gamma \vdash e_1' \equiv e_2' : I ~ \Vec{p} ~ \Vec{e}
+    }{
+        \Gamma \vdash e_1 \equiv e_2 : I ~ \Vec{p} ~ \Vec{e}
+    }
+\end{mathpar}
+
+The second one is also known as a \emph{redundant guard} or \emph{indifference}: if all of the branches are equal and independent of the constructor's arguments, then the entire case or match expression should be equal to that branch.
+%
+\begin{mathpar}
+    \inferrule*[right=case-$\eta_2$]{
+        \Gamma \vdash e_1 \rhd^* \case ~ P ~ t ~ \of ~ \langle c_i \Rightarrow d_i \rangle_i
+        \\\\
+        \Gamma \vdash e_2 \rhd^* e_2'
+        \and
+        \Gamma \vdash d_i \equiv \lambda \Delta_i. ~ e_2' : \Delta_i \to P ~ \Vec{e} ~ t
+    }{
+        \Gamma \vdash e_1 \equiv e_2: P ~ \Vec{e} ~ t
+    }
+    
+    \inferrule*[right=match-$\eta_2$]{
+        \Gamma \vdash e_1 \rhd^* \match ~ x.\Vec{y}.P ~ t ~ \with ~ \langle c_i ~ \Vec{z}_i \Rightarrow d_i \rangle_i
+        \\\\
+        \Gamma \vdash e_2 \rhd^* e_2'
+        \and
+        \Gamma \vdash d_i \equiv e_2' : P[x \mapsto t][\Vec{y} \mapsto \Vec{e}]
+    }{
+        \Gamma \vdash e_1 \equiv e_2: P[x \mapsto t][\Vec{y} \mapsto \Vec{e}]
+    }
+\end{mathpar}
+
+\iffalse
+They are called $\eta$ or $\gamma$ laws; we stick to calling all of them $\eta$. The first could be considered as the traditional $\eta$-reduction rules: if we rebuild the inductive datum from the pieces obtained from decomposition, then we should simply return the original target.
 %
 \begin{align*}
     \case ~ P ~ t ~ \of ~ \langle c_i \Rightarrow \lambda \Delta_i. ~ c_i ~ \Delta_i \rangle_i &\rhd_{\eta} t \\
@@ -463,6 +537,7 @@ Finally, instead of $\eta_1$-reduction, it's sometimes replaced by what's called
     \case ~ P ~ t ~ \of ~ \langle c_i \Rightarrow \lambda \Delta_i. ~ f ~ e_i \rangle_i &\equiv f ~ (\case ~ P ~ t ~ \of ~ \langle c_i \Rightarrow \lambda \Delta_i. ~ e_i \rangle_i) &&\text{when $\Delta_i \notin \meta{FV}(f)$} \\
     \match ~ x.\Vec{y}.P ~ t ~ \with ~ \langle c_i ~ \Vec{z}_i \Rightarrow f ~ d_i \rangle_i &\equiv f ~ (\match ~ x.\Vec{y}.P ~ t ~ \with ~ \langle c_i ~ \Vec{z}_i \Rightarrow d_i \rangle_i) &&\text{when $\Vec{z}_i \notin \meta{FV}(f)$}
 \end{align*}
+\fi
 
 \subsection{Fixed Points}
 
@@ -560,19 +635,19 @@ In terms of our discrimination--decomposition--recursion--termination model, the
 %
 \begin{mathpar}
     \inferrule*[Right=comp]{
-        \Gamma \vdash \Vec{p} : \Delta_P
-        \and
         \Gamma \vdash P : \Delta_I \to (x : I ~ \Delta_P ~ \Delta_I) \to \Type
         \and
         \Gamma \vdash P_i : \Delta_i \to \Delta_{i\mathbb{J}} \to P ~ \Vec{e_i} ~ (c_i ~ \Delta_i)
         \\\\
+        \Gamma \vdash \Vec{p} : \Delta_P
+        \and
         \Gamma \vdash \Vec{e} : \Delta_I
         \and
         \Gamma \vdash \Vec{a} : \Delta_i
         \and
         \Gamma \vdash a_k : \Delta_k \to I ~ \Vec{p} ~ \Vec{e}_k
     }{
-        \Gamma \vdash \const{elim}_I ~ \Vec{p} ~ P ~ \langle P_i \rangle_i ~ \Vec{e} ~ (c_j ~ \Vec{a}) \equiv P_j ~ \Vec{a} ~ \langle \lambda \Delta_{k}. ~ \const{elim}_I ~ \Vec{p} ~ P ~ \langle P_i \rangle_i ~ \Vec{e}_k ~ (a_k ~ \Delta_k) \rangle_{k \in j\mathbb{J}} : P ~ \Vec{e} ~ (c_j ~ \Vec{a})
+        \Gamma \vdash \const{elim}_I ~ \Vec{p} ~ P ~ \langle P_i \rangle_i ~ \Vec{e} ~ (c_j ~ \Vec{a}) \rhd_\mu P_j ~ \Vec{a} ~ \langle \lambda \Delta_{k}. ~ \const{elim}_I ~ \Vec{p} ~ P ~ \langle P_i \rangle_i ~ \Vec{e}_k ~ (a_k ~ \Delta_k) \rangle_{k \in j\mathbb{J}} : P ~ \Vec{e} ~ (c_j ~ \Vec{a})
     }
 \end{mathpar}
 \iffalse
@@ -581,7 +656,7 @@ In terms of our discrimination--decomposition--recursion--termination model, the
 \end{align*}
 \fi
 
-For convenience, the typing premise for $\Vec{a}$ is stated twice for recursive arguments $a_k$. In this case, it should return the same inductive type $I$ with possibly different indices $\Vec{e}_k$. Notice that $\Vec{e}_k$ is used on the right-hand side of the computation rule, but doesn't appear on the left-hand side: this is not a rule we can state in generality as a simple untyped reduction rule.
+For convenience, the typing premise for $\Vec{a}$ is stated twice for recursive arguments $a_k$. In this case, it should return the same inductive type $I$ with possibly different indices $\Vec{e}_k$. Notice that $\Vec{e}_k$ is used on the right-hand side of the computation rule, but doesn't appear on the left-hand side: this is not a rule we can state in generality as a simple untyped reduction rule unless we force constructors to carry around their inductive type indices.
 
 If $I$ \emph{is} a nested inductive type, then all hope is lost: there is no known general way to state the induction principle for a nested inductive definition. For particularly complex ones, these take some creativity to formulate, and are generally proven from the other methods of recursion.
 
@@ -720,7 +795,7 @@ So far, we have only seen inductive definitions whose constructor arguments are 
 
 Occasionally the type is written as $\W (x: A). B(x)$, just as function types may be written as $\Pi (x: A). B(x)$. Intuitively, when interpreted as a tree, there is a branch for each element $a: A$, and a subtree for each element in $B ~ a$. As such, the constructor $\sup ~ a ~ b$ is also written infixively as $a \lhd b$ to evoke ``a picture of a tree growing rightward from a root'' \citep{mcbride-wtype}.
 
-W types can in fact also be interpreted as an encoding for inductive definitions themselves, where the branches are constructors and the subtrees are the recursive arguments. To do so, we need a few base types on top of which we build: a type $\bot$ with no inhabitants, a type $\top$ with (at least) one inhabitant, a boolean type, and a dependent pair type (with some special syntax).\footnote{We previously assumed the existence of $\bot$, interpreting it as the type representing propositional falsehood; we now formalize it as the type asserting that every type has an inhabitant. We can also define $\top$, $\Bool$, and pairs using explicit typing rules, but they would look exactly as expected anyway, and this way we can use case expressions, which are somewhat prettier than eliminators.} We also explicitly state some reduction rules; as seen in \autoref{uniqueness}, having all $\eta$-reduction rules for all case and match expressions can be problematic, so we restrict ourselves to only the ones we need.
+W types can in fact also be interpreted as an encoding for inductive definitions themselves, where the branches are constructors and the subtrees are the recursive arguments. To do so, we need a few base types on top of which we build: a type $\bot$ with no inhabitants, a type $\top$ with (at least) one inhabitant, a boolean type, and a dependent pair type (with some special syntax).\footnote{We previously assumed the existence of $\bot$, interpreting it as the type representing propositional falsehood; we now formalize it as the type asserting that every type has an inhabitant. We can also define $\top$, $\Bool$, and pairs using explicit typing rules, but they would look exactly as expected anyway, and this way we can use case expressions, which are somewhat prettier than eliminators.} We also explicitly state a uniqueness rule for $\top$, while implicitly assuming the usual ones for functions and pairs.
 %
 \begin{align*}
     \bot &: \Type \\
@@ -733,6 +808,21 @@ W types can in fact also be interpreted as an encoding for inductive definitions
     \data ~ (x: A \times B) &: \Type ~ \where \\
     (a, b) &: (x: A \times B)
 \end{align*}
+\begin{mathpar}
+    \inferrule*[right=$\top$-uniq]{
+        \Gamma \vdash e_1 \rhd^* \star
+        \and
+        \Gamma \vdash e_2 \rhd^* x
+        \and
+        (x: \top) \in \Gamma
+    }{
+        \Gamma \vdash e_1 \equiv e_2 : \top
+    }
+\end{mathpar}
+
+\iffalse
+We also explicitly state some reduction rules; as seen in \autoref{uniqueness}, having all $\eta$-reduction rules for all case and match expressions can be problematic, so we restrict ourselves to only the ones we need.
+%
 \begin{align*}
     \Gamma (t: \top) \vdash t &\rhd_{\eta_1} \star \\
     (\lambda t: \top. ~ f ~ \star) &\rhd_{\eta_2} f \\
@@ -741,6 +831,7 @@ W types can in fact also be interpreted as an encoding for inductive definitions
     \case ~ P ~ t ~ \of ~ \langle \true \Rightarrow e, \false \Rightarrow e \rangle &\rhd_{\eta_2} e \\
     (\lambda (a, b): (x: A \times B). ~ e) ~ (l, r) &\rhd_\beta e[a \mapsto l, b \mapsto r]
 \end{align*}
+\fi
 
 Now we are able to define some basic structures such as the naturals and binary trees.
 %
@@ -776,7 +867,7 @@ The first immediate downside to using W types as compared to inductive definitio
 
 \subsection{Typing Rules}
 
-Now that we've sufficiently convinced ourselves that W types are a possible alternative to inductive definitions, we formally state their typing rules, omitting repeated premises in the computation rule. Since the constructor is stated separately from the type, we need to explicitly provide the parameters. Notice that the computation rule requires no information gained solely from the typing premises, so we could also write it as a reduction rule.
+Now that we've sufficiently convinced ourselves that W types are a possible alternative to inductive definitions, we formally state their typing rules, omitting repeated premises in the computation rule. Since the constructor is stated separately from the type, we need to explicitly provide the parameters. Notice that the computation rule requires no information gained solely from the typing premises, so we could also write it as an untyped reduction rule.
 
 \begin{mathpar}
     \inferrule*[right=form-W]{
@@ -817,7 +908,7 @@ Now that we've sufficiently convinced ourselves that W types are a possible alte
         \and
         \Gamma \vdash b: B ~ a
     }{
-        \Gamma \vdash \const{wrec} ~ A ~ B ~ P ~ p ~ (\sup ~ A ~ B ~ a ~ b) \equiv p ~ a ~ b ~ (\lambda x: B ~ a. ~ \const{wrec} ~ A ~ B ~ P ~ p ~ (b ~ x)) : P ~ (\sup ~ A ~ B ~ a ~ b)
+        \Gamma \vdash \const{wrec} ~ A ~ B ~ P ~ p ~ (\sup ~ A ~ B ~ a ~ b) \rhd_\mu p ~ a ~ b ~ (\lambda x: B ~ a. ~ \const{wrec} ~ A ~ B ~ P ~ p ~ (b ~ x)) : P ~ (\sup ~ A ~ B ~ a ~ b)
     }
 \end{mathpar}
 
@@ -832,12 +923,16 @@ Being able to define other inductive types using W types, we should expect to al
     &\const{nrec} ~ P ~ pz ~ ps \coloneqq \const{wrec} ~ \Bool ~ (\lambda b: \Bool. ~ \case ~ b ~ \of ~ \langle \false \Rightarrow \bot, \true \Rightarrow \top \rangle) ~ P \\
     &\hspace{9.5em} (\lambda a: \Bool. ~ \case ~ a ~ \of \\
     &\hspace{15.5em} \false \Rightarrow (\lambda b: \bot \to \Nat. ~ (\lambda pw: (x: \bot) \to P ~ (b ~ x). ~ \hole)) \\
-    &\hspace{15.5em} \true \Rightarrow (\lambda b: \top \to \Nat. ~ (\lambda pw: (x: \top) \to P ~ (b ~ x). ~ ps ~ (b ~ \star) ~ (pw ~ \star))))
+    &\hspace{15.5em} \true \Rightarrow (\lambda b: \top \to \Nat. ~ (\lambda pw: (x: \top) \to P ~ (b ~ x). ~ \hole)))
 \end{align*}
 
+Examining the holes we need to fill, the first one has type $P ~ (\sup ~ \false ~ b)$ and the second one has type $P ~ (\sup ~ \true ~ b)$. The usual candidates would be $pz$ and $ps ~ (b ~ \star) ~ (pw ~ \star)$, which have type $P ~ (\sup ~ \false ~ (\lambda x: \bot. ~ x ~ \Nat))$ and $P ~ (\sup ~ \true ~ (\lambda x: \top. ~ b ~ \star))$, respectively. The second has the correct type by uniqueness for functions and for $\top$, but not the first one: there's nothing that says that $b \equiv \lambda x: \bot. ~ x ~ \Nat$. For the eliminator of $\BTree$, we are not so lucky.
+
+\iffalse
 We first examine the type of the second branch. By the type of $\const{wrec}$, we are expected to provide a function that returns something of type $P ~ (\sup ~ \true ~ b)$ (omitting the type arguments $A$ and $B$). What we have provided is $ps ~ (b ~ \star) ~ (pw ~ \star)$, which has type $P ~ (\succ ~ (b ~ \star)) \equiv P ~ (\sup ~ \true ~ (\lambda x: \top. ~ b ~ \star))$. By $\eta_2$-reduction for $\top$, this becomes the correct type.
 
 Now we examine the hole that we must fill. We have that its type must be $P ~ (\sup ~ \false ~ b)$, and the obvious candidate is $pz$. Unfortunately, it doesn't have the correct type: its type is $P ~ \zero \equiv P ~ (\sup ~ \false ~ (\lambda x: \bot. ~ x ~ \Nat))$. There's nothing that says that $b \equiv \lambda x: \bot. ~ x ~ \Nat$. This problem is not limited the eliminator for naturals: the leaves of binary trees are defined in exactly the same manner, so its first branch would have the same issue.
+\fi
 
 \begin{align*}
     &\const{btrec}: (P: \BTree \to \Type) \to (pl: P ~ \leaf) \\
@@ -846,15 +941,24 @@ Now we examine the hole that we must fill. We have that its type must be $P ~ (\
     &\const{btrec} ~ P ~ pl ~ pn \coloneqq \const{wrec} ~ \Bool ~ (\lambda b: \Bool. ~ \case ~ b ~ \of ~ \langle \false \Rightarrow \bot, \true \Rightarrow \Bool \rangle) ~ P \\
     &\hspace{9.5em} (\lambda a: \Bool. ~ \case ~ a ~ \of \\
     &\hspace{15.5em} \false \Rightarrow (\lambda b: \bot \to \BTree. ~ (\lambda pw: (x: \bot) \to P ~ (b ~ x). ~ \hole)) \\
-    &\hspace{15.5em} \true \Rightarrow (\lambda b: \Bool \to \BTree. ~ \\
-    &\hspace{19em} (\lambda pw: (x: \Bool) \to P ~ (b ~ x). \\
-    &\hspace{21.5em} pn ~ (b ~ \false) ~ (b ~ \true) ~ (pw ~ \false) ~ (pw ~ \true))))
+    &\hspace{15.5em} \true \Rightarrow (\lambda b: \Bool \to \BTree. (\lambda pw: (x: \Bool) \to P ~ (b ~ x). \hole)))
 \end{align*}
+
+The expected types of the holes are again $P ~ (\sup ~ \false ~ b)$ and $P ~ (\sup ~ \true ~ b)$, with the usual candidates $pl$ and $pn ~ (b ~ \false) ~ (b ~ \true) ~ (pw ~ \false) ~ (pw ~ \true)$. These have types $P ~ (\sup ~ \false ~ (\lambda x: \bot. ~ x ~ \BTree))$ and $$P ~ (\sup ~ \true ~ (\lambda x: \Bool. ~ \case ~ x ~ \of ~ \langle \false \Rightarrow b ~ \false, \true \Rightarrow b ~ \true \rangle)).$$ The former has the same problem as before, while the latter also has the wrong type -- unless we had the (undecidable!) uniqueness rule for booleans. It may be tempting to simply enstate a rule stating $$\case ~ x ~ \of ~ \langle \false \Rightarrow b ~ \false, \true \Rightarrow b ~ \true \rangle \equiv b ~ x$$ but this does not solve the bigger problem. Suppose we used the following to encode a type with three distinct values.
+%
+\begin{align*}
+    \const{Three} &\coloneqq (b: \Bool \times \case ~ b ~ \of ~ \langle \true \Rightarrow \top, \false \Rightarrow \Bool \rangle) \\
+    \const{one} &\coloneqq (\false, \star) \\
+    \const{two} &\coloneqq (\true, \false) \\
+    \const{three} &\coloneqq (\true, \true)
+\end{align*}
+
+Then one of the problems we encounter with trying to define the eliminator for a type with three recursive arguments is that we need to equate $b ~ (\true, x)$ to something like the following: $$\case ~ x ~ \of ~ \langle \true \Rightarrow b ~ (\true, \false), \false \Rightarrow b ~ (\true, \true) \rangle$$ This is clearly not a simple case of identifying a function application, but rather a substitution into the context $b ~ (\true, \cdot)$. With more complex types, the substitution becomes more complex, and we will really need the full uniqueness rule for booleans.
 
 \subsection{Explicit Base Cases}
 
 Perhaps the most unusual part of using W types to define inductive data is the use of $\bot$ and its elimination in defining the base cases. This isn't strictly necessary; we could instead explicitly define a new W type with a constructor specifically for representing constructors that do not take a recursive argument. The computation rules are as expected and written instead in reduction rule form.
-%
+
 \begin{mathpar}
     \inferrule*[right=form-W]{
         \Gamma \vdash Z: \Type
@@ -921,7 +1025,7 @@ Now we are able to define the eliminator for naturals as expected.
     &\hspace{9.5em} (\lambda x: \top. ~ \lambda b: \top \to \Nat. ~ \lambda pw: (x: \bot) \to P ~ (b ~ x). ~ ps ~ (b ~ \star) ~ (pw ~ \star))
 \end{align*}
 
-In the base case, we are expected to provide a $P ~ (\zub ~ z)$ when $z: \top$, which $\eta_1$-reduces to $P ~ (\zub ~ \star)$, and we give $pz$, which has exactly that type. In the step case, we are expected to provide a function that returns a $P ~ (\sup ~ \star ~ b)$, and we give $ps ~ (b ~ \star) ~ (pw ~ \star)$, whose type is $P ~ (\sup ~ \star ~ (\lambda x: \top. ~ b ~ \star))$. Once again, by $\eta_2$-reduction for $\top$, this reduces to the correct type.
+In the base case, we are expected to provide a $P ~ (\zub ~ z)$ when $z: \top$, and we give $pz : P ~ (\zub ~ \star)$, which is equal by uniqueness for $\top$. In the step case, we are expected to provide a function that returns a $P ~ (\sup ~ \star ~ b)$, and we give $$ps ~ (b ~ \star) ~ (pw ~ \star): P ~ (\sup ~ \star ~ (\lambda x: \top. ~ b ~ \star))$$ Once again, by uniqueness for functions and for $\top$, we have the correct type.
 
 \section{$\mu$ Types}
 
@@ -1598,6 +1702,80 @@ Setoids?? 0-groupoids?? Bishop sets?? Quotient types?? I don't understand these?
         \Gamma \vdash (\lambda y : A. ~ f ~ y) \equiv f : (x : A) \to B
     }
 \end{mathpar}
+
+\iffalse
+\section{Equivalence Rules}
+
+\begin{mathpar}
+    \inferrule*[right=$\equiv$]{
+        \Gamma \vdash e_1 \rhd^* e
+        \and
+        \Gamma \vdash e_2 \rhd^* e
+    }{
+        \Gamma \vdash e_1 \equiv e_2
+    }
+    \\
+    \inferrule*[right=$\equiv$-Lam-$\eta_1$]{
+        \Gamma \vdash e_1 \rhd^* (\lambda x: A. ~ e)
+        \and
+        \Gamma \vdash e_2 \rhd^* e_2'
+        \\\\
+        \Gamma (x: A) \vdash e \equiv e_2' ~ x
+    }{
+        \Gamma \vdash e_1 \equiv e_2
+    }
+    \inferrule*[right=$\equiv$-Lam-$\eta_2$]{
+        \Gamma \vdash e_1 \rhd^* e_1'
+        \and
+        \Gamma \vdash e_2 \rhd^* (\lambda x: A. ~ e)
+        \\\\
+        \Gamma (x: A) \vdash e_1' ~ x \equiv e
+    }{
+        \Gamma \vdash e_1 \equiv e_2
+    }
+    \\
+    \inferrule*[right=$\equiv$-$\top$-$\eta_1$]{
+        \Gamma \vdash e_1 \rhd^* \star
+        \and
+        \Gamma \vdash e_2 \rhd^* x
+        \\\\
+        (x: \top) \in \Gamma
+    }{
+        \Gamma \vdash e_1 \equiv e_2
+    }
+
+    \inferrule*[right=$\equiv$-$\top$-$\eta_2$]{
+        \Gamma \vdash e_1 \rhd^* x
+        \and
+        \Gamma \vdash e_2 \rhd^* \star
+        \\\\
+        (x: \top) \in \Gamma
+    }{
+        \Gamma \vdash e_1 \equiv e_2
+    }
+    \\
+    \inferrule*[right=$\equiv$-If-$\eta_1$]{
+        \Gamma \vdash e_1 \rhd^* \ite{e}{e_1' ~ \true}{e_1' ~ \false}
+        \and
+        \Gamma \vdash e_2 \rhd^* e_2'
+        \and
+        \Gamma \vdash e_1' ~ e \equiv e_2'
+    }{
+        \Gamma \vdash e_1 \equiv e_2
+    }
+    
+    \inferrule*[right=$\equiv$-If-$\eta_2$]{
+        \Gamma \vdash e_1 \rhd^* e_1'
+        \and
+        \Gamma \vdash e_2 \rhd^* \ite{e}{e_2' ~ \true}{e_2' ~ \false}
+        \and
+        \Gamma \vdash e_1' \equiv e_2' ~ e
+    }{
+        \Gamma \vdash e_1 \equiv e_2
+    }
+\end{mathpar}
+\fi
+
 \end{appendices}
 
 \end{document}
