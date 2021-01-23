@@ -424,7 +424,7 @@ There is also a uniqueness rule for case and match expressions, but it renders t
         \and
         \Gamma (x: I ~ \Vec{p} ~ \Vec{e}) \vdash d: P[\Vec{y} \mapsto \Vec{e}]
     }{
-        \Gamma \vdash \match ~ x.\Vec{y}.P ~ t ~ \of \langle c_i ~ \vec{z}_i \Rightarrow d[x \mapsto c_i ~ \vec{z}] \rangle_i \equiv d[x \mapsto t] : P[x \mapsto t][\Vec{y} \mapsto \Vec{e}]
+        \Gamma \vdash \match ~ x.\Vec{y}.P ~ t ~ \of \langle c_i ~ \Vec{z}_i \Rightarrow d[x \mapsto c_i ~ \Vec{z}] \rangle_i \equiv d[x \mapsto t] : P[x \mapsto t][\Vec{y} \mapsto \Vec{e}]
     }
 \end{mathpar}
 
@@ -448,7 +448,7 @@ This uniqueness rule can instead be split into a number of simpler rules \citep{
         \\\\
         \Gamma \vdash e_2 \rhd^* e_2'
         \and
-        \Gamma \vdash d_i \equiv c_i ~ \Vec{z}_i : I ~ \Vec{p} ~ \Vec{e}
+        \Gamma \Delta_i \vdash d_i[\Vec{z}_i \mapsto \Delta_i] \equiv c_i ~ \Delta_i : I ~ \Vec{p} ~ \Vec{e}
         \and
         \Gamma \vdash e_1' \equiv e_2' : I ~ \Vec{p} ~ \Vec{e}
     }{
@@ -485,14 +485,14 @@ They are called $\eta$ or $\gamma$ laws; we stick to calling all of them $\eta$.
 %
 \begin{align*}
     \case ~ P ~ t ~ \of ~ \langle c_i \Rightarrow \lambda \Delta_i. ~ c_i ~ \Delta_i \rangle_i &\rhd_{\eta} t \\
-    \match ~ x.\Vec{y}.P ~ t ~ \with ~ \langle c_i ~ \vec{z}_i \Rightarrow c_i ~ \vec{z} \rangle_i &\rhd_{\eta} t
+    \match ~ x.\Vec{y}.P ~ t ~ \with ~ \langle c_i ~ \Vec{z}_i \Rightarrow c_i ~ \Vec{z} \rangle_i &\rhd_{\eta} t
 \end{align*}
 
 Sometimes this rule isn't strong enough, as we will see in \autoref{wtypes}. We could add what are also known as \emph{filling-up rules} \citep{well-ordering}.
 %
 \begin{align*}
     \case ~ P ~ t ~ \of ~ \langle c_i \Rightarrow \lambda \Delta_i. ~ f ~ (c_i ~ \Delta_i) \rangle_i &\rhd_{\eta_1} f ~ t \\
-    \match ~ x.\Vec{y}.P ~ t ~ \with ~ \langle c_i ~ \vec{z}_i \Rightarrow f ~ (c_i ~ \vec{z}) \rangle_i &\rhd_{\eta_1} f ~ t
+    \match ~ x.\Vec{y}.P ~ t ~ \with ~ \langle c_i ~ \Vec{z}_i \Rightarrow f ~ (c_i ~ \Vec{z}) \rangle_i &\rhd_{\eta_1} f ~ t
 \end{align*}
 
 However, this breaks confluence! Consider a mere unit type $\top$ with a single inhabitant $\star$ and the following term:
@@ -510,7 +510,7 @@ If we apply $\beta$-reduction to the function application in the branch first, t
 %
 \begin{align*}
     \case ~ P ~ t ~ \of ~ \langle c_i \Rightarrow \lambda \Delta_i. ~ e \rangle_i &\rhd_{\eta_2} e && \text{when $\Delta_i \notin \meta{FV}(e)$} \\
-    \match ~ x.\Vec{y}.P ~ t ~ \with ~ \langle c_i ~ \vec{z}_i \Rightarrow e \rangle_i &\rhd_{\eta_2} e && \text{when $\vec{z}_i \notin \meta{FV}(e)$}
+    \match ~ x.\Vec{y}.P ~ t ~ \with ~ \langle c_i ~ \Vec{z}_i \Rightarrow e \rangle_i &\rhd_{\eta_2} e && \text{when $\Vec{z}_i \notin \meta{FV}(e)$}
 \end{align*}
 
 But this is even worse --- this breaks \emph{subject reduction}! Consider now the following term:
@@ -627,7 +627,7 @@ If $\Delta_{\mathbb{J}}$ is empty, then $P_i$ is a \emph{base case}; otherwise, 
     \item $\Delta_P$, $\Delta_I$: Parameters and indices
     \item $c_i$, $\Delta_i$, $\Vec{e}_i$: The $ith$ constructor, its arguments, and the indices of its inductive type
     \item $P$, $P_i$: Major and minor premises
-    \item $\Delta_{\mathbb{J}}$: Inductive hypotheses
+    \item $\Delta_{i\mathbb{J}}$: Inductive hypotheses
     \item $\Vec{e}_{ij}, \Delta_{ij}$: Recursive argument indices and unnamed (arguments to the $j$th arguments of the $i$th constructor)
 \end{itemize}
 
@@ -1647,6 +1647,9 @@ On the other hand, functional extensionality can be derived using equality refle
     }}}}}
 \end{mathpar}
 
+\section{Paths}
+
+\iffalse
 \subsection{Setoids and Quotient Types}
 
 \begin{quote}
@@ -1656,6 +1659,7 @@ On the other hand, functional extensionality can be derived using equality refle
 \end{quote}
 
 Setoids?? 0-groupoids?? Bishop sets?? Quotient types?? I don't understand these??? what
+\fi
 
 \printbibliography[title=References]
 
