@@ -1586,7 +1586,7 @@ Then we can derive both \jelim and \kelim from \subst with a functional version 
     \\
     &\kelim : (A : \Type) \to (a : A) \to (P : (p : a =_A a) \to \Type) \\
     &\quad \to (d : P ~ \refl_a) \to (p : a =_A a) \to P ~ p \\
-    &\kelim ~ A ~ a ~ P ~ d ~ p \coloneqq \subst ~ (a =_A a) ~ P ~ \refl_a ~ (\rip ~ A ~ a ~ a ~ p) ~ d
+    &\kelim ~ A ~ a ~ P ~ d ~ p \coloneqq \subst ~ (a =_A a) ~ P ~ \refl_a ~ p ~ (\rip ~ A ~ a ~ a ~ p) ~ d
 \end{align*}
 
 For \jelim, the idea is that we \subst over $p$ from $P ~ a ~ a ~ p$ to $P ~ a ~ b ~ p$, and to obtain $P ~ a ~ a ~ p$ we \subst over \rip from $P ~ a ~ a ~ \refl_a$. For \kelim, we simply \subst over $\rip$ from $P ~ \refl_a$ to $P ~ p$.
