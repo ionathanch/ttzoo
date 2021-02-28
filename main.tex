@@ -398,8 +398,8 @@ Notice that $P$ and $d_i$ are all terms of function type, but do not have to syn
 This results in function application in the computation rule for case expressions and substitution in the computation rule for match expressions. Since they don't rely on any of the types and clearly compute in one direction, we can instead write them as untyped reduction rules, sometimes referred to as \emph{$\iota$-reduction}.
 %
 \begin{align*}
-    \case ~ P ~ (c_j ~ \Vec{a}) ~ \of ~ \langle c_i \Rightarrow d_i \rangle_i &\rhd_\iota d_j ~ \Vec{a} \\
-    \match ~ x.\Vec{y}.P ~ (c_j ~ \Vec{a}) ~ \with ~ \langle c_i ~ \Vec{z}_i \Rightarrow d_i \rangle_i &\rhd_\iota d_j[\Vec{z}_j \mapsto \Vec{a}]
+    \case ~ P ~ (c_j ~ \Vec{p} ~ \Vec{a}) ~ \of ~ \langle c_i \Rightarrow d_i \rangle_i &\rhd_\iota d_j ~ \Vec{a} \\
+    \match ~ x.\Vec{y}.P ~ (c_j ~ \Vec{p} ~ \Vec{a}) ~ \with ~ \langle c_i ~ \Vec{z}_i \Rightarrow d_i \rangle_i &\rhd_\iota d_j[\Vec{z}_j \mapsto \Vec{a}]
 \end{align*}
 
 \subsubsection{Uniqueness Rules}\label{uniqueness}
@@ -414,7 +414,7 @@ There is also a uniqueness rule for case and match expressions, but it renders t
         \and
         \Gamma (x: I ~ \Vec{p} ~ \Vec{e}) \vdash d: P ~ \Vec{e} ~ x
     }{
-        \Gamma \vdash \case ~ P ~ t ~ \of ~ \langle c_i \Rightarrow \lambda \Delta_i. ~ d[x \mapsto c_i ~ \Delta_i] \rangle_i \equiv d[x \mapsto t] : P ~ \Vec{e} ~ t
+        \Gamma \vdash \case ~ P ~ t ~ \of ~ \langle c_i \Rightarrow \lambda \Delta_i. ~ d[x \mapsto c_i ~ \Vec{p} ~ \Delta_i] \rangle_i \equiv d[x \mapsto t] : P ~ \Vec{e} ~ t
     }
     
     \inferrule*[right=match-uniq]{
@@ -424,7 +424,7 @@ There is also a uniqueness rule for case and match expressions, but it renders t
         \and
         \Gamma (x: I ~ \Vec{p} ~ \Vec{e}) \vdash d: P[\Vec{y} \mapsto \Vec{e}]
     }{
-        \Gamma \vdash \match ~ x.\Vec{y}.P ~ t ~ \of \langle c_i ~ \Vec{z}_i \Rightarrow d[x \mapsto c_i ~ \Vec{z}] \rangle_i \equiv d[x \mapsto t] : P[x \mapsto t][\Vec{y} \mapsto \Vec{e}]
+        \Gamma \vdash \match ~ x.\Vec{y}.P ~ t ~ \of \langle c_i ~ \Vec{z}_i \Rightarrow d[x \mapsto c_i ~ \Vec{p} ~ \Vec{z}] \rangle_i \equiv d[x \mapsto t] : P[x \mapsto t][\Vec{y} \mapsto \Vec{e}]
     }
 \end{mathpar}
 
@@ -436,7 +436,7 @@ This uniqueness rule can instead be split into a number of simpler rules \citep{
         \\\\
         \Gamma \vdash e_2 \rhd^* e_2'
         \and
-        \Gamma \vdash d_i \equiv c_i : \Delta_i \to I ~ \Vec{p} ~ \Vec{e}
+        \Gamma \vdash d_i \equiv c_i ~ \Vec{p} : \Delta_i \to I ~ \Vec{p} ~ \Vec{e}
         \and
         \Gamma \vdash e_1' \equiv e_2' : I ~ \Vec{p} ~ \Vec{e}
     }{
@@ -448,7 +448,7 @@ This uniqueness rule can instead be split into a number of simpler rules \citep{
         \\\\
         \Gamma \vdash e_2 \rhd^* e_2'
         \and
-        \Gamma \Delta_i \vdash d_i[\Vec{z}_i \mapsto \Delta_i] \equiv c_i ~ \Delta_i : I ~ \Vec{p} ~ \Vec{e}
+        \Gamma \Delta_i \vdash d_i[\Vec{z}_i \mapsto \Delta_i] \equiv c_i ~ \Vec{p} ~ \Delta_i : I ~ \Vec{p} ~ \Vec{e}
         \and
         \Gamma \vdash e_1' \equiv e_2' : I ~ \Vec{p} ~ \Vec{e}
     }{
@@ -588,8 +588,8 @@ The argument $f$ in the function $d$ represents the entire fixed point itself, w
 Although case expressions and fixed point operators have a more function-like presentation while match and fixpoint have a more pattern-like presentation, we are free to mix and match as we like. And just like case and match expressions, fixed point operators and fixpoints have untyped reduction rules that use function application and substitution, respectively. They are also referred to as \emph{$\mu$-reduction} rules.
 %
 \begin{align*}
-    (\fixpoint ~ f ~ \Delta ~ (x : I ~ \Vec{p} ~ \Vec{e}) : P ~ \inn ~ d) ~ \Vec{b} ~ (c ~ \Vec{a}) &\rhd_{\mu} d[f \mapsto \fixpoint ~ f ~ \Delta ~ (x : I ~ \Vec{p} ~ \Vec{e}) : P ~ \inn ~ d][\Delta \mapsto \Vec{b}][x \mapsto c ~ \Vec{a}] \\
-    (\fix ~ d) ~ \Vec{b} ~ (c ~ \Vec{a}) &\rhd_{\mu} d ~ (\fix ~ d) ~ \Vec{b} ~ (c ~ \Vec{a})
+    (\fixpoint ~ f ~ \Delta ~ (x : I ~ \Vec{p} ~ \Vec{e}) : P ~ \inn ~ d) ~ \Vec{b} ~ (c ~ \Vec{p} ~ \Vec{a}) &\rhd_{\mu} d[f \mapsto \fixpoint ~ f ~ \Delta ~ (x : I ~ \Vec{p} ~ \Vec{e}) : P ~ \inn ~ d][\Delta \mapsto \Vec{b}][x \mapsto c ~ \Vec{p} ~ \Vec{a}] \\
+    (\fix ~ d) ~ \Vec{b} ~ (c ~ \Vec{p} ~ \Vec{a}) &\rhd_{\mu} d ~ (\fix ~ d) ~ \Vec{b} ~ (c ~ \Vec{p} ~ \Vec{a})
 \end{align*}
 
 \subsection{Eliminators}
@@ -658,7 +658,20 @@ In terms of our discrimination--decomposition--recursion--termination model, the
 
 For convenience, the typing premise for $\Vec{a}$ is stated twice for recursive arguments $a_k$. In this case, it should return the same inductive type $I$ with possibly different indices $\Vec{e}_k$. Notice that $\Vec{e}_k$ is used on the right-hand side of the computation rule, but doesn't appear on the left-hand side: this is not a rule we can state in generality as a simple untyped reduction rule unless we force constructors to carry around their inductive type indices.
 
-If $I$ \emph{is} a nested inductive type, then all hope is lost: there is no known general way to state the induction principle for a nested inductive definition. For particularly complex ones, these take some creativity to formulate, and are generally proven from the other methods of recursion.
+\subsubsection{Deep Induction}
+
+If $I$ \emph{is} a nested inductive type, then the eliminator built from the above process isn't strong enough, since the major premise is never applied to the nested arguments. We need to build an eliminator that corresponds to the nested inductive type's \emph{deep induction} principle \citep{deep-ind}. The precise details are complex and involved, but the general process is as follows:
+
+\begin{enumerate}
+    \item Abstract the major premise over the parameters: $P: \Delta_P \to \Delta_I \to (x: I ~ \Delta_P ~ \Delta_I) \to \Type$.
+    \item Abstract the minor premises over the parameters and over additional predicates $Q_k: A_k \to \Type$ for each parameter $A_k$.
+    \item Add additional arguments of type $Q_k ~ A_k$ for each parameter to each minor premise.
+    \item Define a predicate-lifting inductive definition $I\hat{~}$ that takes predicates $Q_k$ and applies them pointwise to the parameters, as well as corresponding definitions for each inductive type under which $I$ is nested.
+    \item In each minor premise, add arguments that lift the predicate $P$ for every occurrence of a nested argument.
+    \item Add a new premise $I\hat{~} ~ \Delta_P ~ \Vec{Q} ~ \Delta_I$ that lifts all predicates $Q_k$.
+\end{enumerate}
+
+This doesn't quite cover all possible nested inductive types, including \emph{truly} nested types. Some examples are given in the following subsection.
 
 \subsection{Examples}
 
@@ -731,6 +744,9 @@ Analogous to lists are \emph{vectors}, which are lists whose lengths are encoded
 \end{align*}
 
 \subsubsection{An Eliminator for Trees}
+
+% TODO: Update to bring in line with the methodology for deep induction
+% TODO: Add an example for truly nested types (e.g. bushes)
 
 Although we don't have a general method for deriving the eliminator for nested inductive definitions, we can still analyze particular instances and derive sensible eliminators for them. Consider for instance the $\Tree$ type. The major premise is straightforwardly $$P: \Tree ~ A \to \Type.$$ As for the minor premise corresponding to the $\tree$ constructor, we begin with $$pt: (a: A) \to (l: \List ~ (\Tree ~ A)) \to \; \hole \to P ~ (\tree ~ a ~ l).$$ For the missing inductive hypothesis, we need to capture the idea of $P$ holding for every tree in the list, implemented using pattern matching as recursive calls on the trees. So we create a new data definition that contains these proofs.
 %
